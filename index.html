@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rabbit Run</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="game-shell">
+        <header class="hud">
+          <h1>Rabbit Run</h1>
+          <div class="stats">
+            <p>Distance: <span id="distance">0</span> m</p>
+            <p>Speed: <span id="speed">1.0</span>x</p>
+          </div>
+        </header>
+
+        <canvas id="game" width="960" height="360" aria-label="Retro rabbit game"></canvas>
+
+        <footer class="ui-panel">
+          <p id="message">Press SPACE or LEFT CLICK to jump.</p>
+          <button id="restart" type="button" hidden>Play Again</button>
+        </footer>
+      </section>
+    </main>
+
+    <script src="game.js"></script>
+  </body>
+</html>
