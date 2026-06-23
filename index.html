@@ -11,13 +11,18 @@
       <section class="game-shell">
         <header class="hud">
           <h1>Rabbit Run</h1>
-          <div class="stats">
-            <p>Distance: <span id="distance">0</span> m</p>
-            <p>Speed: <span id="speed">1.0</span>x</p>
+          <div class="hud-right">
+            <div class="stats">
+              <p>Time: <span id="time">0.00</span>s</p>
+              <p>Distance: <span id="distance">0</span> m</p>
+              <p>Speed: <span id="speed">1.0</span>x</p>
+              <p>Best: <span id="best-time">0.00</span>s</p>
+            </div>
+            <button id="pause" type="button" aria-label="Pause game" title="Pause (P)">||</button>
           </div>
         </header>
 
-        <canvas id="game" width="960" height="360" aria-label="Retro rabbit game"></canvas>
+        <canvas id="game" width="1280" height="420" aria-label="Retro rabbit game"></canvas>
 
         <footer class="ui-panel">
           <p id="message">Press SPACE or LEFT CLICK to jump.</p>
