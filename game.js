@@ -25,7 +25,8 @@ const POWER_UP_INTERVAL_METERS = 600;
 const POWER_UP_RANDOM_OFFSET_MAX = 200;
 const POWER_UP_RARITY_DISTANCE_SCALE = 5000;
 const JUMP_SOUND_DURATION = 0.12;
-const POWER_UP_SOUND_DURATION = 0.45;
+const POWER_UP_NOTE_DURATION = 0.12;
+const POWER_UP_NOTE_GAP = 0.025;
 
 function runWhenAudioReady(context, onReady) {
   if (context.state === "suspended") {
@@ -125,31 +126,34 @@ function playPowerUpSound() {
 
   const triggerPowerUpSound = () => {
     const now = context.currentTime;
-    const endTime = now + POWER_UP_SOUND_DURATION;
+    const notes = [523.25, 440, 659.25];
 
-    const leadOsc = context.createOscillator();
-    leadOsc.type = "square";
-    leadOsc.frequency.setValueAtTime(280, now);
-    leadOsc.frequency.exponentialRampToValueAtTime(1040, endTime);
+    for (let i = 0; i < notes.length; i++) {
+      const startTime = now + i * (POWER_UP_NOTE_DURATION + POWER_UP_NOTE_GAP);
+      const endTime = startTime + POWER_UP_NOTE_DURATION;
 
-    const bodyOsc = context.createOscillator();
-    bodyOsc.type = "sawtooth";
-    bodyOsc.frequency.setValueAtTime(140, now);
-    bodyOsc.frequency.exponentialRampToValueAtTime(520, endTime);
+      const leadOsc = context.createOscillator();
+      leadOsc.type = "square";
+      leadOsc.frequency.setValueAtTime(notes[i], startTime);
 
-    const gain = context.createGain();
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.42, now + 0.03);
-    gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
+      const bodyOsc = context.createOscillator();
+      bodyOsc.type = "triangle";
+      bodyOsc.frequency.setValueAtTime(notes[i] / 2, startTime);
 
-    leadOsc.connect(gain);
-    bodyOsc.connect(gain);
-    gain.connect(context.destination);
+      const gain = context.createGain();
+      gain.gain.setValueAtTime(0.0001, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.34, startTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
 
-    leadOsc.start(now);
-    bodyOsc.start(now);
-    leadOsc.stop(endTime);
-    bodyOsc.stop(endTime);
+      leadOsc.connect(gain);
+      bodyOsc.connect(gain);
+      gain.connect(context.destination);
+
+      leadOsc.start(startTime);
+      bodyOsc.start(startTime);
+      leadOsc.stop(endTime);
+      bodyOsc.stop(endTime);
+    }
   };
 
   runWhenAudioReady(context, triggerPowerUpSound);
