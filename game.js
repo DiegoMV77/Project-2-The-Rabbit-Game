@@ -322,12 +322,28 @@ function spawnRock() {
   const w = widthByHeight[h] ?? randomRange(56, 84) * widthScale;
   const spawnOffsetMax = 120 + earlySpacingBonus - hardModeProgress * 50;
 
-  state.rocks.push({
-    x: canvas.width + randomRange(0, spawnOffsetMax),
-    y: GROUND_Y - h,
-    w,
-    h
-  });
+  // Keep rocks from spawning directly on top of golden carrots.
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const rock = {
+      x: canvas.width + randomRange(0, spawnOffsetMax),
+      y: GROUND_Y - h,
+      w,
+      h
+    };
+
+    let overlapsPowerUp = false;
+    for (const powerUp of state.powerUps) {
+      if (intersects(rock, powerUp)) {
+        overlapsPowerUp = true;
+        break;
+      }
+    }
+
+    if (!overlapsPowerUp) {
+      state.rocks.push(rock);
+      return;
+    }
+  }
 }
 
 function spawnBird() {
@@ -407,12 +423,22 @@ function getRockCollisionShape(rock) {
     const leftInset = Math.min(Math.floor(cols * 0.4), domeInset + jag);
     const rightInset = Math.min(Math.floor(cols * 0.4), domeInset + profile[(row + 4) % profile.length]);
     const rowWidth = Math.max(2, cols - leftInset - rightInset);
+    const rowX = rock.x + leftInset * px;
+    const rowY = rock.y + row * px;
+    const maxRowWidth = Math.max(0, rock.w - leftInset * px);
+    const maxRowHeight = Math.max(0, rock.h - row * px);
+    const clampedRowWidth = Math.min(rowWidth * px, maxRowWidth);
+    const clampedRowHeight = Math.min(px, maxRowHeight);
+
+    if (clampedRowWidth <= 0 || clampedRowHeight <= 0) {
+      continue;
+    }
 
     rowBounds.push({
-      y: rock.y + row * px,
-      x: rock.x + leftInset * px,
-      w: rowWidth * px,
-      h: px
+      x: rowX,
+      y: rowY,
+      w: clampedRowWidth,
+      h: clampedRowHeight
     });
   }
 
@@ -704,33 +730,10 @@ function drawRabbit() {
 }
 
 function drawRock(rock) {
-  const px = 2;
-  const rows = Math.max(8, Math.floor(rock.h / px));
-  const cols = Math.max(16, Math.floor(rock.w / px));
-  const variant = Math.floor((rock.w + rock.h) % 3);
+  const rowBounds = getRockCollisionShape(rock);
 
-  const jagProfiles = [
-    [2, 1, 2, 1, 0, 1, 2, 2, 3, 2, 1, 2],
-    [1, 2, 1, 0, 1, 2, 2, 3, 2, 2, 1, 2],
-    [2, 2, 1, 1, 0, 1, 2, 3, 2, 1, 2, 1]
-  ];
-  const profile = jagProfiles[variant];
-
-  for (let row = 0; row < rows; row++) {
-    const t = row / Math.max(1, rows - 1);
-    const domeInset = Math.round((1 - t) * cols * 0.22);
-    const jag = profile[row % profile.length];
-    const leftInset = Math.min(Math.floor(cols * 0.4), domeInset + jag);
-    const rightInset = Math.min(Math.floor(cols * 0.4), domeInset + profile[(row + 4) % profile.length]);
-    const rowWidth = Math.max(2, cols - leftInset - rightInset);
-
-    drawPixelRect(
-      rock.x + leftInset * px,
-      rock.y + row * px,
-      rowWidth * px,
-      px,
-      "#777d86"
-    );
+  for (const row of rowBounds) {
+    drawPixelRect(row.x, row.y, row.w, row.h, "#777d86");
   }
 
   drawPixelRect(rock.x + 8, rock.y + 4, Math.max(8, rock.w * 0.38), 3, "#a4acb8");
