@@ -28,8 +28,8 @@ const JUMP_SOUND_DURATION = 0.12;
 const POWER_UP_NOTE_GAP = 0.045;
 const HIT_SOUND_DURATION = 0.24;
 const BGM_WINDOW_KEY = "__rabbitGameBgmAudio";
-const BGM_FILE_PATH = "assets/bgm.wav?v=3";
-const BGM_PLAYBACK_RATE = 1.35;
+const BGM_FILE_PATH = "assets/bgm.wav?v=4";
+const BGM_PLAYBACK_RATE = 1.0;
 
 let bgmAudio = null;
 let bgmStartPromise = null;
