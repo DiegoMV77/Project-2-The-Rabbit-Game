@@ -29,8 +29,10 @@ const POWER_UP_NOTE_GAP = 0.045;
 const HIT_SOUND_DURATION = 0.24;
 const MUSIC_STEP_SECONDS = 0.18;
 const BGM_SAMPLE_RATE = 22050;
+const BGM_WINDOW_KEY = "__rabbitGameBgmAudio";
 
 let bgmAudio = null;
+let bgmStartPromise = null;
 
 const MUSIC_PATTERN = [
   { lead: 659.25, bass: 164.81 },
@@ -73,20 +75,12 @@ function createBgmWavDataUri() {
     const timeInStep = t - stepIndex * stepSeconds;
 
     const leadEnv = Math.max(0, 1 - timeInStep / (stepSeconds * 0.9));
-    const bassEnv = Math.max(0, 1 - timeInStep / (stepSeconds * 0.95));
-
     let sampleValue = 0;
 
     if (step.lead) {
       const leadPhase = (t * step.lead) % 1;
       const leadWave = leadPhase < 0.5 ? 1 : -1;
-      sampleValue += leadWave * leadEnv * 0.26;
-    }
-
-    if (step.bass) {
-      const bassPhase = (t * step.bass) % 1;
-      const bassWave = bassPhase < 0.5 ? 1 : -1;
-      sampleValue += bassWave * bassEnv * 0.18;
+      sampleValue += leadWave * leadEnv * 0.34;
     }
 
     const clamped = Math.max(-1, Math.min(1, sampleValue));
@@ -137,10 +131,19 @@ function getBgmAudio() {
     return bgmAudio;
   }
 
+  const existingGlobalAudio = window[BGM_WINDOW_KEY];
+  if (existingGlobalAudio instanceof Audio) {
+    bgmAudio = existingGlobalAudio;
+    bgmAudio.loop = true;
+    bgmAudio.volume = 0.48;
+    return bgmAudio;
+  }
+
   const audio = new Audio(createBgmWavDataUri());
   audio.loop = true;
   audio.volume = 0.48;
   audio.preload = "auto";
+  window[BGM_WINDOW_KEY] = audio;
   bgmAudio = audio;
   return bgmAudio;
 }
@@ -149,16 +152,22 @@ function startBackgroundMusic() {
   ensureAudioUnlocked();
 
   const audio = getBgmAudio();
-  if (!audio || !audio.paused) {
+  if (!audio || !audio.paused || bgmStartPromise) {
     return;
   }
 
-  audio.play().catch(() => {
-    // Keep gameplay running even if browser blocks autoplay.
-  });
+  bgmStartPromise = audio
+    .play()
+    .catch(() => {
+      // Keep gameplay running even if browser blocks autoplay.
+    })
+    .finally(() => {
+      bgmStartPromise = null;
+    });
 }
 
 function stopBackgroundMusic() {
+  bgmStartPromise = null;
   if (!bgmAudio) {
     return;
   }
