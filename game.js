@@ -25,7 +25,7 @@ const POWER_UP_INTERVAL_METERS = 600;
 const POWER_UP_RANDOM_OFFSET_MAX = 200;
 const POWER_UP_RARITY_DISTANCE_SCALE = 5000;
 const JUMP_SOUND_DURATION = 0.12;
-const POWER_UP_SOUND_NOTE_DURATION = 0.085;
+const POWER_UP_SOUND_NOTE_DURATION = 0.12;
 
 function runWhenAudioReady(context, onReady) {
   if (context.state === "suspended") {
@@ -103,26 +103,34 @@ function playPowerUpSound() {
 
   const triggerPowerUpSound = () => {
     const now = context.currentTime;
-    const notes = [660, 880, 1174];
+    const notes = [392, 523.25, 659.25, 783.99];
+    const noteGap = 0.03;
 
     for (let i = 0; i < notes.length; i++) {
-      const startTime = now + i * (POWER_UP_SOUND_NOTE_DURATION * 0.88);
+      const startTime = now + i * (POWER_UP_SOUND_NOTE_DURATION + noteGap);
       const endTime = startTime + POWER_UP_SOUND_NOTE_DURATION;
 
-      const osc = context.createOscillator();
-      osc.type = "square";
-      osc.frequency.setValueAtTime(notes[i], startTime);
+      const leadOsc = context.createOscillator();
+      leadOsc.type = "square";
+      leadOsc.frequency.setValueAtTime(notes[i], startTime);
+
+      const bodyOsc = context.createOscillator();
+      bodyOsc.type = "triangle";
+      bodyOsc.frequency.setValueAtTime(notes[i] / 2, startTime);
 
       const gain = context.createGain();
       gain.gain.setValueAtTime(0.0001, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.22, startTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.32, startTime + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
 
-      osc.connect(gain);
+      leadOsc.connect(gain);
+      bodyOsc.connect(gain);
       gain.connect(context.destination);
 
-      osc.start(startTime);
-      osc.stop(endTime);
+      leadOsc.start(startTime);
+      bodyOsc.start(startTime);
+      leadOsc.stop(endTime);
+      bodyOsc.stop(endTime);
     }
   };
 
