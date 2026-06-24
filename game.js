@@ -27,7 +27,7 @@ const POWER_UP_RARITY_DISTANCE_SCALE = 5000;
 const JUMP_SOUND_DURATION = 0.12;
 const POWER_UP_NOTE_GAP = 0.045;
 const HIT_SOUND_DURATION = 0.24;
-const MUSIC_STEP_SECONDS = 0.16;
+const MUSIC_STEP_SECONDS = 0.18;
 
 const MUSIC_PATTERN = [
   { lead: 659.25, bass: 164.81 },
@@ -234,8 +234,8 @@ function playMusicStep(step) {
   }
 
   const now = context.currentTime;
-  const leadDuration = 0.11;
-  const bassDuration = 0.13;
+  const leadDuration = 0.145;
+  const bassDuration = 0.16;
 
   if (step.lead) {
     const leadOsc = context.createOscillator();
@@ -244,7 +244,7 @@ function playMusicStep(step) {
 
     const leadGain = context.createGain();
     leadGain.gain.setValueAtTime(0.0001, now);
-    leadGain.gain.exponentialRampToValueAtTime(0.07, now + 0.008);
+    leadGain.gain.exponentialRampToValueAtTime(0.18, now + 0.008);
     leadGain.gain.exponentialRampToValueAtTime(0.0001, now + leadDuration);
 
     leadOsc.connect(leadGain);
@@ -260,7 +260,7 @@ function playMusicStep(step) {
 
     const bassGain = context.createGain();
     bassGain.gain.setValueAtTime(0.0001, now);
-    bassGain.gain.exponentialRampToValueAtTime(0.045, now + 0.01);
+    bassGain.gain.exponentialRampToValueAtTime(0.12, now + 0.01);
     bassGain.gain.exponentialRampToValueAtTime(0.0001, now + bassDuration);
 
     bassOsc.connect(bassGain);
@@ -271,6 +271,7 @@ function playMusicStep(step) {
 }
 
 function updateBackgroundMusic(dt) {
+  ensureAudioUnlocked();
   state.musicStepTimer += dt;
 
   while (state.musicStepTimer >= MUSIC_STEP_SECONDS) {
@@ -409,6 +410,9 @@ function jump() {
   if (!state.started) {
     state.started = true;
     messageEl.textContent = "Run for the giant carrot!";
+    ensureAudioUnlocked();
+    playMusicStep(MUSIC_PATTERN[state.musicStepIndex]);
+    state.musicStepIndex = (state.musicStepIndex + 1) % MUSIC_PATTERN.length;
   }
   if (state.rabbit.grounded) {
     const jumpVelocity =
