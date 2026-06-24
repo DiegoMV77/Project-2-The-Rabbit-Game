@@ -28,6 +28,9 @@ const JUMP_SOUND_DURATION = 0.12;
 const POWER_UP_NOTE_GAP = 0.045;
 const HIT_SOUND_DURATION = 0.24;
 const MUSIC_STEP_SECONDS = 0.18;
+const BGM_SAMPLE_RATE = 22050;
+
+let bgmAudio = null;
 
 const MUSIC_PATTERN = [
   { lead: 659.25, bass: 164.81 },
@@ -56,6 +59,111 @@ function runWhenAudioReady(context, onReady) {
 
 let audioCtx = null;
 let audioUnlocked = false;
+
+function createBgmWavDataUri() {
+  const stepSeconds = MUSIC_STEP_SECONDS;
+  const totalSeconds = MUSIC_PATTERN.length * stepSeconds;
+  const sampleCount = Math.floor(totalSeconds * BGM_SAMPLE_RATE);
+  const pcm = new Int16Array(sampleCount);
+
+  for (let i = 0; i < sampleCount; i++) {
+    const t = i / BGM_SAMPLE_RATE;
+    const stepIndex = Math.floor(t / stepSeconds) % MUSIC_PATTERN.length;
+    const step = MUSIC_PATTERN[stepIndex];
+    const timeInStep = t - stepIndex * stepSeconds;
+
+    const leadEnv = Math.max(0, 1 - timeInStep / (stepSeconds * 0.9));
+    const bassEnv = Math.max(0, 1 - timeInStep / (stepSeconds * 0.95));
+
+    let sampleValue = 0;
+
+    if (step.lead) {
+      const leadPhase = (t * step.lead) % 1;
+      const leadWave = leadPhase < 0.5 ? 1 : -1;
+      sampleValue += leadWave * leadEnv * 0.26;
+    }
+
+    if (step.bass) {
+      const bassPhase = (t * step.bass) % 1;
+      const bassWave = bassPhase < 0.5 ? 1 : -1;
+      sampleValue += bassWave * bassEnv * 0.18;
+    }
+
+    const clamped = Math.max(-1, Math.min(1, sampleValue));
+    pcm[i] = Math.floor(clamped * 32767);
+  }
+
+  const dataSize = pcm.length * 2;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  function writeString(offset, value) {
+    for (let i = 0; i < value.length; i++) {
+      view.setUint8(offset + i, value.charCodeAt(i));
+    }
+  }
+
+  writeString(0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(8, "WAVE");
+  writeString(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, BGM_SAMPLE_RATE, true);
+  view.setUint32(28, BGM_SAMPLE_RATE * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, "data");
+  view.setUint32(40, dataSize, true);
+
+  let offset = 44;
+  for (const sample of pcm) {
+    view.setInt16(offset, sample, true);
+    offset += 2;
+  }
+
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+
+  return `data:audio/wav;base64,${btoa(binary)}`;
+}
+
+function getBgmAudio() {
+  if (bgmAudio) {
+    return bgmAudio;
+  }
+
+  const audio = new Audio(createBgmWavDataUri());
+  audio.loop = true;
+  audio.volume = 0.48;
+  audio.preload = "auto";
+  bgmAudio = audio;
+  return bgmAudio;
+}
+
+function startBackgroundMusic() {
+  const audio = getBgmAudio();
+  if (!audio || !audio.paused) {
+    return;
+  }
+
+  audio.play().catch(() => {
+    // Keep gameplay running even if browser blocks autoplay.
+  });
+}
+
+function stopBackgroundMusic() {
+  if (!bgmAudio) {
+    return;
+  }
+
+  bgmAudio.pause();
+  bgmAudio.currentTime = 0;
+}
 
 function getAudioContext() {
   if (audioCtx) {
@@ -272,6 +380,7 @@ function playMusicStep(step) {
 
 function updateBackgroundMusic(dt) {
   ensureAudioUnlocked();
+  startBackgroundMusic();
   state.musicStepTimer += dt;
 
   while (state.musicStepTimer >= MUSIC_STEP_SECONDS) {
@@ -319,6 +428,7 @@ const state = {
 };
 
 function resetGame() {
+  stopBackgroundMusic();
   state.rabbit.y = GROUND_Y - state.rabbit.h;
   state.rabbit.vy = 0;
   state.rabbit.grounded = true;
@@ -428,6 +538,7 @@ function jump() {
 
 function queueJump() {
   ensureAudioUnlocked();
+  startBackgroundMusic();
   state.jumpBufferTimer = JUMP_BUFFER_SECONDS;
   jump();
 }
@@ -583,6 +694,7 @@ function intersectsRock(rabbit, rock) {
 
 function update(dt) {
   if (!state.started || state.paused || state.gameOver || state.win) {
+    stopBackgroundMusic();
     return;
   }
 
