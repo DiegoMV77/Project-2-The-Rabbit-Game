@@ -24,6 +24,53 @@ const DISTANCE_TO_PIXEL_SCALE = 10;
 const POWER_UP_INTERVAL_METERS = 600;
 const POWER_UP_RANDOM_OFFSET_MAX = 200;
 const POWER_UP_RARITY_DISTANCE_SCALE = 5000;
+const JUMP_SOUND_DURATION = 0.12;
+
+let audioCtx = null;
+
+function getAudioContext() {
+  if (audioCtx) {
+    return audioCtx;
+  }
+
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    return null;
+  }
+
+  audioCtx = new AudioContextClass();
+  return audioCtx;
+}
+
+function playJumpSound() {
+  const context = getAudioContext();
+  if (!context) {
+    return;
+  }
+
+  if (context.state === "suspended") {
+    context.resume();
+  }
+
+  const now = context.currentTime;
+  const endTime = now + JUMP_SOUND_DURATION;
+
+  const osc = context.createOscillator();
+  osc.type = "square";
+  osc.frequency.setValueAtTime(640, now);
+  osc.frequency.exponentialRampToValueAtTime(220, endTime);
+
+  const gain = context.createGain();
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.18, now + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
+
+  osc.connect(gain);
+  gain.connect(context.destination);
+
+  osc.start(now);
+  osc.stop(endTime);
+}
 
 const state = {
   rabbit: {
@@ -159,6 +206,7 @@ function jump() {
     state.rabbit.vy = jumpVelocity;
     state.rabbit.grounded = false;
     state.jumpBufferTimer = 0;
+    playJumpSound();
   }
 }
 
