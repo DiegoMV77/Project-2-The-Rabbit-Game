@@ -25,6 +25,21 @@ const POWER_UP_INTERVAL_METERS = 600;
 const POWER_UP_RANDOM_OFFSET_MAX = 200;
 const POWER_UP_RARITY_DISTANCE_SCALE = 5000;
 const JUMP_SOUND_DURATION = 0.12;
+const POWER_UP_SOUND_NOTE_DURATION = 0.085;
+
+function runWhenAudioReady(context, onReady) {
+  if (context.state === "suspended") {
+    context
+      .resume()
+      .then(onReady)
+      .catch(() => {
+        // Ignore resume failures and keep gameplay uninterrupted.
+      });
+    return;
+  }
+
+  onReady();
+}
 
 let audioCtx = null;
 
@@ -77,17 +92,41 @@ function playJumpSound() {
     bodyOsc.stop(endTime);
   };
 
-  if (context.state === "suspended") {
-    context
-      .resume()
-      .then(triggerJumpSound)
-      .catch(() => {
-        // Ignore resume failures and keep gameplay uninterrupted.
-      });
+  runWhenAudioReady(context, triggerJumpSound);
+}
+
+function playPowerUpSound() {
+  const context = getAudioContext();
+  if (!context) {
     return;
   }
 
-  triggerJumpSound();
+  const triggerPowerUpSound = () => {
+    const now = context.currentTime;
+    const notes = [660, 880, 1174];
+
+    for (let i = 0; i < notes.length; i++) {
+      const startTime = now + i * (POWER_UP_SOUND_NOTE_DURATION * 0.88);
+      const endTime = startTime + POWER_UP_SOUND_NOTE_DURATION;
+
+      const osc = context.createOscillator();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(notes[i], startTime);
+
+      const gain = context.createGain();
+      gain.gain.setValueAtTime(0.0001, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.22, startTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
+
+      osc.connect(gain);
+      gain.connect(context.destination);
+
+      osc.start(startTime);
+      osc.stop(endTime);
+    }
+  };
+
+  runWhenAudioReady(context, triggerPowerUpSound);
 }
 
 const state = {
@@ -453,6 +492,7 @@ function update(dt) {
     const puHitbox = { x: powerUp.x + 2, y: powerUp.y + 2, w: powerUp.w - 4, h: powerUp.h - 4 };
     if (intersects(rabbitHitbox, puHitbox)) {
       state.invincibilityTimer = INVINCIBILITY_DURATION;
+      playPowerUpSound();
       messageEl.textContent = `Power up! Invincible - ${Math.ceil(state.invincibilityTimer)}s left`;
       state.powerUps = state.powerUps.filter((pu) => pu !== powerUp);
     }
