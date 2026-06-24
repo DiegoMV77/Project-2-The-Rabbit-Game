@@ -126,7 +126,7 @@ function playPowerUpSound() {
   const triggerPowerUpSound = () => {
     const now = context.currentTime;
     // do - da - dee: medium note, lower note, short high note.
-    const notes = [523.25, 392.0, 783.99];
+    const notes = [1046.5, 783.99, 1567.98];
     const durations = [0.13, 0.13, 0.2];
 
     for (let i = 0; i < notes.length; i++) {
@@ -135,17 +135,17 @@ function playPowerUpSound() {
       const endTime = startTime + durations[i];
 
       const leadOsc = context.createOscillator();
-      leadOsc.type = "square";
+      leadOsc.type = "sawtooth";
       leadOsc.frequency.setValueAtTime(notes[i], startTime);
       leadOsc.frequency.exponentialRampToValueAtTime(notes[i] * 0.96, endTime);
 
       const bodyOsc = context.createOscillator();
-      bodyOsc.type = "triangle";
-      bodyOsc.frequency.setValueAtTime(notes[i] / 2, startTime);
+      bodyOsc.type = "square";
+      bodyOsc.frequency.setValueAtTime(notes[i] * 0.75, startTime);
 
       const gain = context.createGain();
       gain.gain.setValueAtTime(0.0001, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.45, startTime + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.4, startTime + 0.01);
       gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
 
       leadOsc.connect(gain);
