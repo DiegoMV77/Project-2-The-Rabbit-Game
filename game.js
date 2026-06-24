@@ -31,10 +31,6 @@ const MUSIC_STEP_SECONDS = 0.18;
 const BGM_SAMPLE_RATE = 22050;
 
 let bgmAudio = null;
-let bgmBuffer = null;
-let bgmSource = null;
-let bgmGain = null;
-let bgmEngine = "none";
 
 const MUSIC_PATTERN = [
   { lead: 659.25, bass: 164.81 },
@@ -149,112 +145,26 @@ function getBgmAudio() {
   return bgmAudio;
 }
 
-function getWebAudioBgmBuffer(context) {
-  if (bgmBuffer) {
-    return bgmBuffer;
-  }
-
-  const stepSeconds = MUSIC_STEP_SECONDS;
-  const totalSeconds = MUSIC_PATTERN.length * stepSeconds;
-  const sampleCount = Math.floor(totalSeconds * context.sampleRate);
-  const buffer = context.createBuffer(1, sampleCount, context.sampleRate);
-  const channel = buffer.getChannelData(0);
-
-  for (let i = 0; i < sampleCount; i++) {
-    const t = i / context.sampleRate;
-    const stepIndex = Math.floor(t / stepSeconds) % MUSIC_PATTERN.length;
-    const step = MUSIC_PATTERN[stepIndex];
-    const stepStart = stepIndex * stepSeconds;
-    const timeInStep = t - stepStart;
-
-    const leadEnv = Math.max(0, 1 - timeInStep / (stepSeconds * 0.9));
-    const bassEnv = Math.max(0, 1 - timeInStep / (stepSeconds * 0.95));
-
-    let sample = 0;
-
-    if (step.lead) {
-      const leadPhase = (t * step.lead) % 1;
-      sample += (leadPhase < 0.5 ? 1 : -1) * 0.32 * leadEnv;
-    }
-
-    if (step.bass) {
-      const bassPhase = (t * step.bass) % 1;
-      sample += (bassPhase < 0.5 ? 1 : -1) * 0.24 * bassEnv;
-    }
-
-    channel[i] = Math.max(-1, Math.min(1, sample));
-  }
-
-  bgmBuffer = buffer;
-  return bgmBuffer;
-}
-
 function startBackgroundMusic() {
   ensureAudioUnlocked();
 
-  const context = getAudioContext();
-  if (context) {
-    runWhenAudioReady(context, () => {
-      if (!bgmSource) {
-        const source = context.createBufferSource();
-        source.buffer = getWebAudioBgmBuffer(context);
-        source.loop = true;
-
-        const gain = context.createGain();
-        gain.gain.setValueAtTime(0.2, context.currentTime);
-
-        source.connect(gain);
-        gain.connect(context.destination);
-        source.start();
-
-        bgmSource = source;
-        bgmGain = gain;
-        bgmEngine = "webaudio";
-
-        // Ensure HTML audio fallback is not running at the same time.
-        if (bgmAudio && !bgmAudio.paused) {
-          bgmAudio.pause();
-          bgmAudio.currentTime = 0;
-        }
-      }
-    });
-    return;
-  }
-
   const audio = getBgmAudio();
-  if (!audio || !audio.paused || bgmEngine === "webaudio") {
+  if (!audio || !audio.paused) {
     return;
   }
 
   audio.play().catch(() => {
     // Keep gameplay running even if browser blocks autoplay.
   });
-  bgmEngine = "html-audio";
 }
 
 function stopBackgroundMusic() {
-  if (bgmSource) {
-    try {
-      bgmSource.stop();
-    } catch {
-      // No-op if source already stopped.
-    }
-    bgmSource.disconnect();
-    bgmSource = null;
-  }
-
-  if (bgmGain) {
-    bgmGain.disconnect();
-    bgmGain = null;
-  }
-
   if (!bgmAudio) {
     return;
   }
 
   bgmAudio.pause();
   bgmAudio.currentTime = 0;
-  bgmEngine = "none";
 }
 
 function getAudioContext() {
