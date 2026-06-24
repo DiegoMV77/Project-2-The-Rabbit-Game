@@ -27,8 +27,8 @@ const POWER_UP_RARITY_DISTANCE_SCALE = 5000;
 const JUMP_SOUND_DURATION = 0.12;
 const POWER_UP_NOTE_GAP = 0.045;
 const HIT_SOUND_DURATION = 0.24;
-const BGM_WINDOW_KEY = "__rabbitGameBgmAudio";
-const BGM_FILE_PATH = "assets/bgm.wav?v=4";
+const BGM_WINDOW_KEY = "__rabbitGameBgmAudioV2";
+const BGM_FILE_PATH = "assets/background-theme-v2.wav";
 const BGM_PLAYBACK_RATE = 1.0;
 
 let bgmAudio = null;
@@ -59,7 +59,7 @@ function getBgmAudio() {
   const existingGlobalAudio = window[BGM_WINDOW_KEY];
   if (existingGlobalAudio instanceof Audio) {
     bgmAudio = existingGlobalAudio;
-    if (!bgmAudio.src.includes("assets/bgm.wav")) {
+    if (!bgmAudio.src.includes("assets/background-theme-v2.wav")) {
       bgmAudio.pause();
       bgmAudio.currentTime = 0;
       bgmAudio.src = BGM_FILE_PATH;
