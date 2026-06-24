@@ -26,7 +26,7 @@ const POWER_UP_RANDOM_OFFSET_MAX = 200;
 const POWER_UP_RARITY_DISTANCE_SCALE = 5000;
 const JUMP_SOUND_DURATION = 0.12;
 const POWER_UP_NOTE_GAP = 0.045;
-const HIT_SOUND_DURATION = 0.14;
+const HIT_SOUND_DURATION = 0.24;
 
 function runWhenAudioReady(context, onReady) {
   if (context.state === "suspended") {
@@ -164,6 +164,7 @@ function playPowerUpSound() {
 }
 
 function playHitSound() {
+  ensureAudioUnlocked();
   const context = getAudioContext();
   if (!context) {
     return;
@@ -173,35 +174,42 @@ function playHitSound() {
     const now = context.currentTime;
     const endTime = now + HIT_SOUND_DURATION;
 
-    const thudOsc = context.createOscillator();
-    thudOsc.type = "triangle";
-    thudOsc.frequency.setValueAtTime(220, now);
-    thudOsc.frequency.exponentialRampToValueAtTime(72, endTime);
+    // Part 1: punchy collision impact.
+    const impactOsc = context.createOscillator();
+    impactOsc.type = "square";
+    impactOsc.frequency.setValueAtTime(760, now);
+    impactOsc.frequency.exponentialRampToValueAtTime(140, now + 0.08);
 
-    const clickOsc = context.createOscillator();
-    clickOsc.type = "square";
-    clickOsc.frequency.setValueAtTime(950, now);
-    clickOsc.frequency.exponentialRampToValueAtTime(420, now + 0.04);
+    const impactGain = context.createGain();
+    impactGain.gain.setValueAtTime(0.0001, now);
+    impactGain.gain.exponentialRampToValueAtTime(0.55, now + 0.006);
+    impactGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.085);
 
-    const thudGain = context.createGain();
-    thudGain.gain.setValueAtTime(0.0001, now);
-    thudGain.gain.exponentialRampToValueAtTime(0.35, now + 0.008);
-    thudGain.gain.exponentialRampToValueAtTime(0.0001, endTime);
+    impactOsc.connect(impactGain);
+    impactGain.connect(context.destination);
 
-    const clickGain = context.createGain();
-    clickGain.gain.setValueAtTime(0.0001, now);
-    clickGain.gain.exponentialRampToValueAtTime(0.2, now + 0.003);
-    clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
+    // Part 2: quick chirp tail like an arcade fail cue.
+    const tailStart = now + 0.09;
+    const tailEnd = endTime;
 
-    thudOsc.connect(thudGain);
-    clickOsc.connect(clickGain);
-    thudGain.connect(context.destination);
-    clickGain.connect(context.destination);
+    const tailOsc = context.createOscillator();
+    tailOsc.type = "triangle";
+    tailOsc.frequency.setValueAtTime(410, tailStart);
+    tailOsc.frequency.exponentialRampToValueAtTime(220, tailEnd);
 
-    thudOsc.start(now);
-    clickOsc.start(now);
-    thudOsc.stop(endTime);
-    clickOsc.stop(now + 0.05);
+    const tailGain = context.createGain();
+    tailGain.gain.setValueAtTime(0.0001, tailStart);
+    tailGain.gain.exponentialRampToValueAtTime(0.35, tailStart + 0.012);
+    tailGain.gain.exponentialRampToValueAtTime(0.0001, tailEnd);
+
+    tailOsc.connect(tailGain);
+    tailGain.connect(context.destination);
+
+    impactOsc.start(now);
+    impactOsc.stop(now + 0.09);
+
+    tailOsc.start(tailStart);
+    tailOsc.stop(tailEnd);
   };
 
   runWhenAudioReady(context, triggerHitSound);
