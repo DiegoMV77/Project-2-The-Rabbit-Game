@@ -25,8 +25,7 @@ const POWER_UP_INTERVAL_METERS = 600;
 const POWER_UP_RANDOM_OFFSET_MAX = 200;
 const POWER_UP_RARITY_DISTANCE_SCALE = 5000;
 const JUMP_SOUND_DURATION = 0.12;
-const POWER_UP_NOTE_DURATION = 0.12;
-const POWER_UP_NOTE_GAP = 0.025;
+const POWER_UP_NOTE_GAP = 0.045;
 
 function runWhenAudioReady(context, onReady) {
   if (context.state === "suspended") {
@@ -126,15 +125,19 @@ function playPowerUpSound() {
 
   const triggerPowerUpSound = () => {
     const now = context.currentTime;
-    const notes = [523.25, 440, 659.25];
+    // do - da - dee: medium note, lower note, short high note.
+    const notes = [523.25, 392.0, 783.99];
+    const durations = [0.13, 0.13, 0.2];
 
     for (let i = 0; i < notes.length; i++) {
-      const startTime = now + i * (POWER_UP_NOTE_DURATION + POWER_UP_NOTE_GAP);
-      const endTime = startTime + POWER_UP_NOTE_DURATION;
+      const previousDurations = durations.slice(0, i).reduce((sum, d) => sum + d, 0);
+      const startTime = now + previousDurations + i * POWER_UP_NOTE_GAP;
+      const endTime = startTime + durations[i];
 
       const leadOsc = context.createOscillator();
       leadOsc.type = "square";
       leadOsc.frequency.setValueAtTime(notes[i], startTime);
+      leadOsc.frequency.exponentialRampToValueAtTime(notes[i] * 0.96, endTime);
 
       const bodyOsc = context.createOscillator();
       bodyOsc.type = "triangle";
@@ -142,7 +145,7 @@ function playPowerUpSound() {
 
       const gain = context.createGain();
       gain.gain.setValueAtTime(0.0001, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.34, startTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.45, startTime + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
 
       leadOsc.connect(gain);
