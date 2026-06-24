@@ -27,23 +27,11 @@ const POWER_UP_RARITY_DISTANCE_SCALE = 5000;
 const JUMP_SOUND_DURATION = 0.12;
 const POWER_UP_NOTE_GAP = 0.045;
 const HIT_SOUND_DURATION = 0.24;
-const MUSIC_STEP_SECONDS = 0.18;
-const BGM_SAMPLE_RATE = 22050;
 const BGM_WINDOW_KEY = "__rabbitGameBgmAudio";
+const BGM_FILE_PATH = "assets/bgm.wav?v=2";
 
 let bgmAudio = null;
 let bgmStartPromise = null;
-
-const MUSIC_PATTERN = [
-  { lead: 659.25, bass: 164.81 },
-  { lead: 783.99, bass: null },
-  { lead: 659.25, bass: 196.0 },
-  { lead: 523.25, bass: null },
-  { lead: 587.33, bass: 146.83 },
-  { lead: 659.25, bass: null },
-  { lead: 493.88, bass: 174.61 },
-  { lead: 783.99, bass: null }
-];
 
 function runWhenAudioReady(context, onReady) {
   if (context.state === "suspended") {
@@ -62,70 +50,6 @@ function runWhenAudioReady(context, onReady) {
 let audioCtx = null;
 let audioUnlocked = false;
 
-function createBgmWavDataUri() {
-  const stepSeconds = MUSIC_STEP_SECONDS;
-  const totalSeconds = MUSIC_PATTERN.length * stepSeconds;
-  const sampleCount = Math.floor(totalSeconds * BGM_SAMPLE_RATE);
-  const pcm = new Int16Array(sampleCount);
-
-  for (let i = 0; i < sampleCount; i++) {
-    const t = i / BGM_SAMPLE_RATE;
-    const stepIndex = Math.floor(t / stepSeconds) % MUSIC_PATTERN.length;
-    const step = MUSIC_PATTERN[stepIndex];
-    const timeInStep = t - stepIndex * stepSeconds;
-
-    const leadEnv = Math.max(0, 1 - timeInStep / (stepSeconds * 0.9));
-    let sampleValue = 0;
-
-    if (step.lead) {
-      const leadPhase = (t * step.lead) % 1;
-      const leadWave = leadPhase < 0.5 ? 1 : -1;
-      sampleValue += leadWave * leadEnv * 0.34;
-    }
-
-    const clamped = Math.max(-1, Math.min(1, sampleValue));
-    pcm[i] = Math.floor(clamped * 32767);
-  }
-
-  const dataSize = pcm.length * 2;
-  const buffer = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(buffer);
-
-  function writeString(offset, value) {
-    for (let i = 0; i < value.length; i++) {
-      view.setUint8(offset + i, value.charCodeAt(i));
-    }
-  }
-
-  writeString(0, "RIFF");
-  view.setUint32(4, 36 + dataSize, true);
-  writeString(8, "WAVE");
-  writeString(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, BGM_SAMPLE_RATE, true);
-  view.setUint32(28, BGM_SAMPLE_RATE * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeString(36, "data");
-  view.setUint32(40, dataSize, true);
-
-  let offset = 44;
-  for (const sample of pcm) {
-    view.setInt16(offset, sample, true);
-    offset += 2;
-  }
-
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-
-  return `data:audio/wav;base64,${btoa(binary)}`;
-}
-
 function getBgmAudio() {
   if (bgmAudio) {
     return bgmAudio;
@@ -134,12 +58,18 @@ function getBgmAudio() {
   const existingGlobalAudio = window[BGM_WINDOW_KEY];
   if (existingGlobalAudio instanceof Audio) {
     bgmAudio = existingGlobalAudio;
+    if (!bgmAudio.src.includes("assets/bgm.wav")) {
+      bgmAudio.pause();
+      bgmAudio.currentTime = 0;
+      bgmAudio.src = BGM_FILE_PATH;
+      bgmAudio.load();
+    }
     bgmAudio.loop = true;
     bgmAudio.volume = 0.48;
     return bgmAudio;
   }
 
-  const audio = new Audio(createBgmWavDataUri());
+  const audio = new Audio(BGM_FILE_PATH);
   audio.loop = true;
   audio.volume = 0.48;
   audio.preload = "auto";
