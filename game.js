@@ -26,6 +26,7 @@ const POWER_UP_RANDOM_OFFSET_MAX = 200;
 const POWER_UP_RARITY_DISTANCE_SCALE = 5000;
 const JUMP_SOUND_DURATION = 0.12;
 const POWER_UP_NOTE_GAP = 0.045;
+const HIT_SOUND_DURATION = 0.14;
 
 function runWhenAudioReady(context, onReady) {
   if (context.state === "suspended") {
@@ -160,6 +161,50 @@ function playPowerUpSound() {
   };
 
   runWhenAudioReady(context, triggerPowerUpSound);
+}
+
+function playHitSound() {
+  const context = getAudioContext();
+  if (!context) {
+    return;
+  }
+
+  const triggerHitSound = () => {
+    const now = context.currentTime;
+    const endTime = now + HIT_SOUND_DURATION;
+
+    const thudOsc = context.createOscillator();
+    thudOsc.type = "triangle";
+    thudOsc.frequency.setValueAtTime(220, now);
+    thudOsc.frequency.exponentialRampToValueAtTime(72, endTime);
+
+    const clickOsc = context.createOscillator();
+    clickOsc.type = "square";
+    clickOsc.frequency.setValueAtTime(950, now);
+    clickOsc.frequency.exponentialRampToValueAtTime(420, now + 0.04);
+
+    const thudGain = context.createGain();
+    thudGain.gain.setValueAtTime(0.0001, now);
+    thudGain.gain.exponentialRampToValueAtTime(0.35, now + 0.008);
+    thudGain.gain.exponentialRampToValueAtTime(0.0001, endTime);
+
+    const clickGain = context.createGain();
+    clickGain.gain.setValueAtTime(0.0001, now);
+    clickGain.gain.exponentialRampToValueAtTime(0.2, now + 0.003);
+    clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
+
+    thudOsc.connect(thudGain);
+    clickOsc.connect(clickGain);
+    thudGain.connect(context.destination);
+    clickGain.connect(context.destination);
+
+    thudOsc.start(now);
+    clickOsc.start(now);
+    thudOsc.stop(endTime);
+    clickOsc.stop(now + 0.05);
+  };
+
+  runWhenAudioReady(context, triggerHitSound);
 }
 
 const state = {
@@ -561,6 +606,7 @@ function update(dt) {
   if (state.invincibilityTimer <= 0) {
     for (const rock of state.rocks) {
       if (intersectsRock(rabbitHitbox, rock)) {
+        playHitSound();
         state.gameOver = true;
         finalizeRunTime();
         messageEl.textContent = `You crashed! Time: ${state.elapsedTime.toFixed(2)}s. Press Play Again.`;
@@ -572,6 +618,7 @@ function update(dt) {
     for (const bird of state.birds) {
       const birdHitbox = { x: bird.x + 3, y: bird.y + 5, w: bird.w - 6, h: bird.h - 8 };
       if (intersects(rabbitHitbox, birdHitbox)) {
+        playHitSound();
         state.gameOver = true;
         finalizeRunTime();
         messageEl.textContent = `A bird got you! Time: ${state.elapsedTime.toFixed(2)}s. Press Play Again.`;
