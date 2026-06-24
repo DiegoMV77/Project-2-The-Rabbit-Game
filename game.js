@@ -28,7 +28,8 @@ const JUMP_SOUND_DURATION = 0.12;
 const POWER_UP_NOTE_GAP = 0.045;
 const HIT_SOUND_DURATION = 0.24;
 const BGM_WINDOW_KEY = "__rabbitGameBgmAudio";
-const BGM_FILE_PATH = "assets/bgm.wav?v=2";
+const BGM_FILE_PATH = "assets/bgm.wav?v=3";
+const BGM_PLAYBACK_RATE = 1.35;
 
 let bgmAudio = null;
 let bgmStartPromise = null;
@@ -66,12 +67,14 @@ function getBgmAudio() {
     }
     bgmAudio.loop = true;
     bgmAudio.volume = 0.48;
+    bgmAudio.playbackRate = BGM_PLAYBACK_RATE;
     return bgmAudio;
   }
 
   const audio = new Audio(BGM_FILE_PATH);
   audio.loop = true;
   audio.volume = 0.48;
+  audio.playbackRate = BGM_PLAYBACK_RATE;
   audio.preload = "auto";
   window[BGM_WINDOW_KEY] = audio;
   bgmAudio = audio;
