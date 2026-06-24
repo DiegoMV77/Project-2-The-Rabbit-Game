@@ -10,7 +10,7 @@ const restartBtn = document.getElementById("restart");
 const pauseBtn = document.getElementById("pause");
 
 const GROUND_Y = 340;
-const GRAVITY = 2200;
+const GRAVITY = 2450;
 const JUMP_VELOCITY = -705;
 const BASE_SPEED = 250;
 const MAX_SPEED = 690;
@@ -18,7 +18,12 @@ const CARROT_GOAL = 10000;
 const BEST_TIME_STORAGE_KEY = "rabbit-run-best-time";
 const JUMP_BUFFER_SECONDS = 0.1;
 const INVINCIBILITY_DURATION = 7.0;
-const POWER_UP_SPAWN_CHANCE = 0.008;
+const INVINCIBILITY_SPEED_MULTIPLIER = 1.1;
+const INVINCIBILITY_JUMP_MULTIPLIER = 1.1;
+const DISTANCE_TO_PIXEL_SCALE = 10;
+const POWER_UP_INTERVAL_METERS = 600;
+const POWER_UP_RANDOM_OFFSET_MAX = 200;
+const POWER_UP_RARITY_DISTANCE_SCALE = 5000;
 
 const state = {
   rabbit: {
@@ -51,8 +56,8 @@ const state = {
   nextRockSpawn: 1,
   birdSpawnTimer: 0,
   nextBirdSpawn: 3,
-  carrotX: CARROT_GOAL,
-  jumpBufferTimer: 0
+  jumpBufferTimer: 0,
+  nextPowerUpDistance: randomRange(0, POWER_UP_RANDOM_OFFSET_MAX)
 };
 
 function resetGame() {
@@ -81,8 +86,8 @@ function resetGame() {
   state.nextRockSpawn = randomRange(0.75, 1.35);
   state.birdSpawnTimer = 0;
   state.nextBirdSpawn = randomRange(4, 7);
-  state.carrotX = CARROT_GOAL;
   state.jumpBufferTimer = 0;
+  state.nextPowerUpDistance = randomRange(0, POWER_UP_RANDOM_OFFSET_MAX);
 
   distanceEl.textContent = "0";
   speedEl.textContent = "1.0";
@@ -147,7 +152,11 @@ function jump() {
     messageEl.textContent = "Run for the giant carrot!";
   }
   if (state.rabbit.grounded) {
-    state.rabbit.vy = JUMP_VELOCITY;
+    const jumpVelocity =
+      state.invincibilityTimer > 0
+        ? JUMP_VELOCITY * INVINCIBILITY_JUMP_MULTIPLIER
+        : JUMP_VELOCITY;
+    state.rabbit.vy = jumpVelocity;
     state.rabbit.grounded = false;
     state.jumpBufferTimer = 0;
   }
@@ -161,16 +170,19 @@ function queueJump() {
 function spawnRock() {
   const heights = [20, 28, 34, 42];
   const h = heights[Math.floor(Math.random() * heights.length)];
+  const levelProgress = Math.min(state.distance / 7000, 1);
+  const widthScale = 0.94 - levelProgress * 0.06;
   const widthByHeight = {
-    20: randomRange(54, 74),
-    28: randomRange(60, 82),
-    34: randomRange(68, 92),
-    42: randomRange(76, 104)
+    20: randomRange(54, 74) * widthScale,
+    28: randomRange(60, 82) * widthScale,
+    34: randomRange(68, 92) * widthScale,
+    42: randomRange(76, 104) * widthScale
   };
-  const w = widthByHeight[h] ?? randomRange(56, 84);
+  const w = widthByHeight[h] ?? randomRange(56, 84) * widthScale;
+  const spawnOffsetMax = 120 - levelProgress * 50;
 
   state.rocks.push({
-    x: canvas.width + randomRange(0, 120),
+    x: canvas.width + randomRange(0, spawnOffsetMax),
     y: GROUND_Y - h,
     w,
     h
@@ -191,12 +203,37 @@ function spawnBird() {
 }
 
 function spawnPowerUp() {
-  state.powerUps.push({
-    x: canvas.width + randomRange(0, 120),
-    y: GROUND_Y - 60,
-    w: 22,
-    h: 22
-  });
+  const powerUpY = GROUND_Y - 22;
+
+  // Try several x positions to keep power-ups on clear ground.
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const powerUp = {
+      x: canvas.width + randomRange(0, 120),
+      y: powerUpY,
+      w: 22,
+      h: 22
+    };
+
+    let overlapsRock = false;
+    for (const rock of state.rocks) {
+      if (intersects(powerUp, rock)) {
+        overlapsRock = true;
+        break;
+      }
+    }
+
+    if (!overlapsRock) {
+      state.powerUps.push(powerUp);
+      return;
+    }
+  }
+}
+
+function scheduleNextPowerUpDistance() {
+  const rarityMultiplier = 1 + state.distance / POWER_UP_RARITY_DISTANCE_SCALE;
+  const interval = POWER_UP_INTERVAL_METERS * rarityMultiplier;
+  const randomOffset = POWER_UP_RANDOM_OFFSET_MAX * rarityMultiplier;
+  state.nextPowerUpDistance += interval + randomRange(0, randomOffset);
 }
 
 function intersects(a, b) {
@@ -262,10 +299,16 @@ function update(dt) {
 
   if (state.invincibilityTimer > 0) {
     state.invincibilityTimer = Math.max(0, state.invincibilityTimer - dt);
+    messageEl.textContent = `Power up! Invincible - ${Math.ceil(state.invincibilityTimer)}s left`;
   }
 
   state.elapsedTime += dt;
   state.speedMultiplier = Math.min(1 + state.distance / 1800, MAX_SPEED / BASE_SPEED);
+  
+  if (state.invincibilityTimer > 0) {
+    state.speedMultiplier *= INVINCIBILITY_SPEED_MULTIPLIER;
+  }
+  
   state.worldSpeed = BASE_SPEED * state.speedMultiplier;
 
   state.distance += state.worldSpeed * dt * 0.1;
@@ -290,7 +333,9 @@ function update(dt) {
   state.rockSpawnTimer += dt;
   if (state.rockSpawnTimer >= state.nextRockSpawn) {
     state.rockSpawnTimer = 0;
-    state.nextRockSpawn = randomRange(0.6, 1.5) * (1.12 - Math.min(state.distance / 6000, 0.2));
+    const levelProgress = Math.min(state.distance / 7000, 1);
+    const spacingScale = 1 - levelProgress * 0.2;
+    state.nextRockSpawn = randomRange(0.55, 1.25) * spacingScale;
     spawnRock();
   }
 
@@ -305,8 +350,9 @@ function update(dt) {
     }
   }
 
-  if (Math.random() < POWER_UP_SPAWN_CHANCE * dt) {
+  while (state.distance >= state.nextPowerUpDistance) {
     spawnPowerUp();
+    scheduleNextPowerUpDistance();
   }
 
   for (const rock of state.rocks) {
@@ -337,7 +383,7 @@ function update(dt) {
     const puHitbox = { x: powerUp.x + 2, y: powerUp.y + 2, w: powerUp.w - 4, h: powerUp.h - 4 };
     if (intersects(rabbitHitbox, puHitbox)) {
       state.invincibilityTimer = INVINCIBILITY_DURATION;
-      messageEl.textContent = "Power up! Invincible for 7 seconds!";
+      messageEl.textContent = `Power up! Invincible - ${Math.ceil(state.invincibilityTimer)}s left`;
       state.powerUps = state.powerUps.filter((pu) => pu !== powerUp);
     }
   }
@@ -389,10 +435,26 @@ function drawBackground() {
   }
 
   const mountainShift = state.mountainOffset % canvas.width;
-  for (let i = -1; i < 3; i++) {
-    const x = i * 380 - mountainShift;
-    drawMountain(x + 80, 180, 150, "#9ec5dc", "#e7f5ff");
-    drawMountain(x + 250, 185, 170, "#8cb6d3", "#deeffb");
+  const mountainTile = 520;
+  let mountainX = -mountainTile - ((mountainShift * 0.55) % mountainTile);
+  while (mountainX < canvas.width + mountainTile) {
+    drawMountain(mountainX + 30, 296, 240, "#a8c6dc", "#f4fbff");
+    drawMountain(mountainX + 250, 300, 270, "#9bbcd5", "#eaf7ff");
+    mountainX += mountainTile;
+  }
+
+  const farHillTile = 520;
+  let farHillX = -farHillTile - (mountainShift % farHillTile);
+  while (farHillX < canvas.width + farHillTile) {
+    drawSnowHill(farHillX, 320, 560, 112, "#dcecf9", "#f3faff");
+    farHillX += farHillTile;
+  }
+
+  const nearHillTile = 460;
+  let nearHillX = -nearHillTile - ((mountainShift * 1.35) % nearHillTile);
+  while (nearHillX < canvas.width + nearHillTile) {
+    drawSnowHill(nearHillX, 336, 500, 82, "#cfe3f3", "#e9f5ff");
+    nearHillX += nearHillTile;
   }
 
   drawPixelRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y, "#f7fcff");
@@ -412,6 +474,28 @@ function drawCloud(x, y, scale) {
   drawPixelRect(x - 8 * scale, y + 4 * scale, w * 0.32, h * 0.65, "#ffffff");
   drawPixelRect(x + w - 3 * scale, y + 6 * scale, w * 0.26, h * 0.55, "#ffffff");
   drawPixelRect(x + 5 * scale, y + h, w * 0.86, 3 * scale, "#e9f6ff");
+}
+
+function drawSnowHill(x, baseY, width, height, hillColor, snowColor) {
+  const peakX = x + width * 0.52;
+
+  ctx.fillStyle = hillColor;
+  ctx.beginPath();
+  ctx.moveTo(x, baseY);
+  ctx.quadraticCurveTo(x + width * 0.22, baseY - height * 0.85, peakX, baseY - height);
+  ctx.quadraticCurveTo(x + width * 0.8, baseY - height * 0.78, x + width, baseY);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = snowColor;
+  ctx.beginPath();
+  ctx.moveTo(x + width * 0.16, baseY - height * 0.52);
+  ctx.quadraticCurveTo(x + width * 0.3, baseY - height * 0.9, peakX, baseY - height);
+  ctx.quadraticCurveTo(x + width * 0.66, baseY - height * 0.86, x + width * 0.84, baseY - height * 0.46);
+  ctx.lineTo(x + width * 0.68, baseY - height * 0.3);
+  ctx.quadraticCurveTo(peakX, baseY - height * 0.65, x + width * 0.28, baseY - height * 0.28);
+  ctx.closePath();
+  ctx.fill();
 }
 
 function drawMountain(x, baseY, width, color, snowColor) {
@@ -439,20 +523,21 @@ function drawRabbit() {
   const r = state.rabbit;
   const hopFrame = r.grounded ? Math.floor((performance.now() / 110) % 2) : 1;
 
-  const rainbowColors = ["#ff0000", "#ff7f00", "#ffff00", "#00ff00", "#0000ff", "#4b0082", "#9400d3"];
+  const goldCycleColors = ["#ffd700", "#ffed4e", "#ffa500", "#ff8c00", "#ff7f00", "#ffb347"];
   let bodyColor = "#f3f3f5";
   let innerColor = "#f6b8cf";
 
   if (state.invincibilityTimer > 0) {
-    const rainbowIndex = Math.floor((performance.now() / 100) % rainbowColors.length);
-    bodyColor = rainbowColors[rainbowIndex];
-    innerColor = rainbowColors[(rainbowIndex + 3) % rainbowColors.length];
+    let cycleSpeed = 100;
     
-    const glowAlpha = 0.4;
-    ctx.fillStyle = rainbowColors[rainbowIndex] + "66";
-    ctx.beginPath();
-    ctx.arc(r.x + r.w / 2, r.y + r.h / 2, 35, 0, Math.PI * 2);
-    ctx.fill();
+    // Flicker faster in the last 3 seconds
+    if (state.invincibilityTimer <= 3) {
+      cycleSpeed = 100 * (state.invincibilityTimer / 3);
+    }
+    
+    const colorIndex = Math.floor((performance.now() / cycleSpeed) % goldCycleColors.length);
+    bodyColor = goldCycleColors[colorIndex];
+    innerColor = goldCycleColors[(colorIndex + 2) % goldCycleColors.length];
   }
 
   drawPixelRect(r.x + 9, r.y + 17, 24, 20, bodyColor);
@@ -528,39 +613,40 @@ function drawBird(bird) {
 }
 
 function drawCarrot() {
-  if (state.win) {
+  const remainingDistance = CARROT_GOAL - state.distance;
+  const x = state.rabbit.x + remainingDistance * DISTANCE_TO_PIXEL_SCALE;
+
+  if (x < -220 || x > canvas.width + 220) {
     return;
   }
 
-  const x = state.carrotX;
-  const y = GROUND_Y - 104;
+  const scale = 2.4;
+  const y = GROUND_Y - 52 * scale;
 
-  drawPixelRect(x + 10, y, 16, 10, "#55a55e");
-  drawPixelRect(x + 4, y + 8, 12, 8, "#63b96f");
-  drawPixelRect(x + 20, y + 8, 12, 8, "#63b96f");
+  drawPixelRect(x + 10 * scale, y, 16 * scale, 10 * scale, "#55a55e");
+  drawPixelRect(x + 4 * scale, y + 8 * scale, 12 * scale, 8 * scale, "#63b96f");
+  drawPixelRect(x + 20 * scale, y + 8 * scale, 12 * scale, 8 * scale, "#63b96f");
 
-  drawPixelRect(x + 10, y + 14, 16, 36, "#ff9528");
-  drawPixelRect(x + 13, y + 22, 10, 4, "#ffb05b");
-  drawPixelRect(x + 12, y + 30, 12, 4, "#ffb05b");
-  drawPixelRect(x + 14, y + 38, 8, 4, "#ffb05b");
+  drawPixelRect(x + 10 * scale, y + 14 * scale, 16 * scale, 36 * scale, "#f28a1f");
+  drawPixelRect(x + 13 * scale, y + 22 * scale, 10 * scale, 4 * scale, "#ffb05b");
+  drawPixelRect(x + 12 * scale, y + 30 * scale, 12 * scale, 4 * scale, "#ffb05b");
+  drawPixelRect(x + 14 * scale, y + 38 * scale, 8 * scale, 4 * scale, "#ffb05b");
 }
 
 function drawPowerUp(powerUp) {
   const x = powerUp.x;
   const y = powerUp.y;
-  const pulse = Math.sin(performance.now() / 150) * 2 + 3;
+  const pulse = Math.sin(performance.now() / 150) * 0.5;
+  const offsetY = pulse * 2;
   
-  ctx.fillStyle = "#ffdd00";
-  ctx.beginPath();
-  ctx.arc(x + powerUp.w / 2, y + powerUp.h / 2, 8 + pulse, 0, Math.PI * 2);
-  ctx.fill();
+  // Golden carrot leaves (green)
+  drawPixelRect(x + 7, y + offsetY, 8, 4, "#55a55e");
+  drawPixelRect(x + 5, y + 2 + offsetY, 4, 4, "#63b96f");
+  drawPixelRect(x + 13, y + 2 + offsetY, 4, 4, "#63b96f");
   
-  ctx.fillStyle = "#ffa500";
-  drawPixelRect(x + 5, y + 8, 4, 6, "#ffa500");
-  drawPixelRect(x + 13, y + 8, 4, 6, "#ffa500");
-  
-  drawPixelRect(x + 6, y + 5, 10, 4, "#ffdd00");
-  drawPixelRect(x + 8, y + 15, 6, 2, "#ffa500");
+  // Golden carrot body
+  drawPixelRect(x + 8, y + 6 + offsetY, 6, 10, "#ffd700");
+  drawPixelRect(x + 9, y + 10 + offsetY, 4, 2, "#ffed4e");
 }
 
 function drawHud() {
