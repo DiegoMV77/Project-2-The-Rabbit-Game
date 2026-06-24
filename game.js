@@ -48,28 +48,46 @@ function playJumpSound() {
     return;
   }
 
+  const triggerJumpSound = () => {
+    const now = context.currentTime;
+    const endTime = now + JUMP_SOUND_DURATION;
+
+    const leadOsc = context.createOscillator();
+    leadOsc.type = "square";
+    leadOsc.frequency.setValueAtTime(880, now);
+    leadOsc.frequency.exponentialRampToValueAtTime(300, endTime);
+
+    const bodyOsc = context.createOscillator();
+    bodyOsc.type = "triangle";
+    bodyOsc.frequency.setValueAtTime(440, now);
+    bodyOsc.frequency.exponentialRampToValueAtTime(180, endTime);
+
+    const gain = context.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.28, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
+
+    leadOsc.connect(gain);
+    bodyOsc.connect(gain);
+    gain.connect(context.destination);
+
+    leadOsc.start(now);
+    bodyOsc.start(now);
+    leadOsc.stop(endTime);
+    bodyOsc.stop(endTime);
+  };
+
   if (context.state === "suspended") {
-    context.resume();
+    context
+      .resume()
+      .then(triggerJumpSound)
+      .catch(() => {
+        // Ignore resume failures and keep gameplay uninterrupted.
+      });
+    return;
   }
 
-  const now = context.currentTime;
-  const endTime = now + JUMP_SOUND_DURATION;
-
-  const osc = context.createOscillator();
-  osc.type = "square";
-  osc.frequency.setValueAtTime(640, now);
-  osc.frequency.exponentialRampToValueAtTime(220, endTime);
-
-  const gain = context.createGain();
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.18, now + 0.012);
-  gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
-
-  osc.connect(gain);
-  gain.connect(context.destination);
-
-  osc.start(now);
-  osc.stop(endTime);
+  triggerJumpSound();
 }
 
 const state = {
