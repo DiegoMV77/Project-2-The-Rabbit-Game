@@ -66,14 +66,14 @@ function getBgmAudio() {
       bgmAudio.load();
     }
     bgmAudio.loop = true;
-    bgmAudio.volume = 0.48;
+    bgmAudio.volume = 0.22;
     bgmAudio.playbackRate = BGM_PLAYBACK_RATE;
     return bgmAudio;
   }
 
   const audio = new Audio(BGM_FILE_PATH);
   audio.loop = true;
-  audio.volume = 0.48;
+  audio.volume = 0.22;
   audio.playbackRate = BGM_PLAYBACK_RATE;
   audio.preload = "auto";
   window[BGM_WINDOW_KEY] = audio;
