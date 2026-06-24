@@ -171,6 +171,8 @@ function spawnRock() {
   const heights = [20, 28, 34, 42];
   const h = heights[Math.floor(Math.random() * heights.length)];
   const levelProgress = Math.min(state.distance / 7000, 1);
+  const hardModeProgress = Math.min(Math.max((state.distance - 300) / 6700, 0), 1);
+  const earlySpacingBonus = state.distance < 300 ? (1 - state.distance / 300) * 60 : 0;
   const widthScale = 0.94 - levelProgress * 0.06;
   const widthByHeight = {
     20: randomRange(54, 74) * widthScale,
@@ -179,7 +181,7 @@ function spawnRock() {
     42: randomRange(76, 104) * widthScale
   };
   const w = widthByHeight[h] ?? randomRange(56, 84) * widthScale;
-  const spawnOffsetMax = 120 - levelProgress * 50;
+  const spawnOffsetMax = 120 + earlySpacingBonus - hardModeProgress * 50;
 
   state.rocks.push({
     x: canvas.width + randomRange(0, spawnOffsetMax),
@@ -333,9 +335,11 @@ function update(dt) {
   state.rockSpawnTimer += dt;
   if (state.rockSpawnTimer >= state.nextRockSpawn) {
     state.rockSpawnTimer = 0;
-    const levelProgress = Math.min(state.distance / 7000, 1);
-    const spacingScale = 1 - levelProgress * 0.2;
-    state.nextRockSpawn = randomRange(0.55, 1.25) * spacingScale;
+    const easyStartProgress = Math.min(state.distance / 300, 1);
+    const hardModeProgress = Math.min(Math.max((state.distance - 300) / 6700, 0), 1);
+    const earlySpacingScale = 1.25 - easyStartProgress * 0.25;
+    const harderSpacingScale = 1 - hardModeProgress * 0.28;
+    state.nextRockSpawn = randomRange(0.55, 1.25) * earlySpacingScale * harderSpacingScale;
     spawnRock();
   }
 
