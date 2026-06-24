@@ -31,6 +31,9 @@ const MUSIC_STEP_SECONDS = 0.18;
 const BGM_SAMPLE_RATE = 22050;
 
 let bgmAudio = null;
+let bgmBuffer = null;
+let bgmSource = null;
+let bgmGain = null;
 
 const MUSIC_PATTERN = [
   { lead: 659.25, bass: 164.81 },
@@ -145,7 +148,70 @@ function getBgmAudio() {
   return bgmAudio;
 }
 
+function getWebAudioBgmBuffer(context) {
+  if (bgmBuffer) {
+    return bgmBuffer;
+  }
+
+  const stepSeconds = MUSIC_STEP_SECONDS;
+  const totalSeconds = MUSIC_PATTERN.length * stepSeconds;
+  const sampleCount = Math.floor(totalSeconds * context.sampleRate);
+  const buffer = context.createBuffer(1, sampleCount, context.sampleRate);
+  const channel = buffer.getChannelData(0);
+
+  for (let i = 0; i < sampleCount; i++) {
+    const t = i / context.sampleRate;
+    const stepIndex = Math.floor(t / stepSeconds) % MUSIC_PATTERN.length;
+    const step = MUSIC_PATTERN[stepIndex];
+    const stepStart = stepIndex * stepSeconds;
+    const timeInStep = t - stepStart;
+
+    const leadEnv = Math.max(0, 1 - timeInStep / (stepSeconds * 0.9));
+    const bassEnv = Math.max(0, 1 - timeInStep / (stepSeconds * 0.95));
+
+    let sample = 0;
+
+    if (step.lead) {
+      const leadPhase = (t * step.lead) % 1;
+      sample += (leadPhase < 0.5 ? 1 : -1) * 0.32 * leadEnv;
+    }
+
+    if (step.bass) {
+      const bassPhase = (t * step.bass) % 1;
+      sample += (bassPhase < 0.5 ? 1 : -1) * 0.24 * bassEnv;
+    }
+
+    channel[i] = Math.max(-1, Math.min(1, sample));
+  }
+
+  bgmBuffer = buffer;
+  return bgmBuffer;
+}
+
 function startBackgroundMusic() {
+  ensureAudioUnlocked();
+
+  const context = getAudioContext();
+  if (context) {
+    runWhenAudioReady(context, () => {
+      if (!bgmSource) {
+        const source = context.createBufferSource();
+        source.buffer = getWebAudioBgmBuffer(context);
+        source.loop = true;
+
+        const gain = context.createGain();
+        gain.gain.setValueAtTime(0.2, context.currentTime);
+
+        source.connect(gain);
+        gain.connect(context.destination);
+        source.start();
+
+        bgmSource = source;
+        bgmGain = gain;
+      }
+    });
+  }
+
   const audio = getBgmAudio();
   if (!audio || !audio.paused) {
     return;
@@ -157,6 +223,21 @@ function startBackgroundMusic() {
 }
 
 function stopBackgroundMusic() {
+  if (bgmSource) {
+    try {
+      bgmSource.stop();
+    } catch {
+      // No-op if source already stopped.
+    }
+    bgmSource.disconnect();
+    bgmSource = null;
+  }
+
+  if (bgmGain) {
+    bgmGain.disconnect();
+    bgmGain = null;
+  }
+
   if (!bgmAudio) {
     return;
   }
@@ -335,59 +416,8 @@ function playHitSound() {
   runWhenAudioReady(context, triggerHitSound);
 }
 
-function playMusicStep(step) {
-  const context = getAudioContext();
-  if (!context || context.state !== "running") {
-    return;
-  }
-
-  const now = context.currentTime;
-  const leadDuration = 0.145;
-  const bassDuration = 0.16;
-
-  if (step.lead) {
-    const leadOsc = context.createOscillator();
-    leadOsc.type = "square";
-    leadOsc.frequency.setValueAtTime(step.lead, now);
-
-    const leadGain = context.createGain();
-    leadGain.gain.setValueAtTime(0.0001, now);
-    leadGain.gain.exponentialRampToValueAtTime(0.18, now + 0.008);
-    leadGain.gain.exponentialRampToValueAtTime(0.0001, now + leadDuration);
-
-    leadOsc.connect(leadGain);
-    leadGain.connect(context.destination);
-    leadOsc.start(now);
-    leadOsc.stop(now + leadDuration);
-  }
-
-  if (step.bass) {
-    const bassOsc = context.createOscillator();
-    bassOsc.type = "triangle";
-    bassOsc.frequency.setValueAtTime(step.bass, now);
-
-    const bassGain = context.createGain();
-    bassGain.gain.setValueAtTime(0.0001, now);
-    bassGain.gain.exponentialRampToValueAtTime(0.12, now + 0.01);
-    bassGain.gain.exponentialRampToValueAtTime(0.0001, now + bassDuration);
-
-    bassOsc.connect(bassGain);
-    bassGain.connect(context.destination);
-    bassOsc.start(now);
-    bassOsc.stop(now + bassDuration);
-  }
-}
-
 function updateBackgroundMusic(dt) {
-  ensureAudioUnlocked();
   startBackgroundMusic();
-  state.musicStepTimer += dt;
-
-  while (state.musicStepTimer >= MUSIC_STEP_SECONDS) {
-    state.musicStepTimer -= MUSIC_STEP_SECONDS;
-    playMusicStep(MUSIC_PATTERN[state.musicStepIndex]);
-    state.musicStepIndex = (state.musicStepIndex + 1) % MUSIC_PATTERN.length;
-  }
 }
 
 const state = {
@@ -422,9 +452,7 @@ const state = {
   birdSpawnTimer: 0,
   nextBirdSpawn: 3,
   jumpBufferTimer: 0,
-  nextPowerUpDistance: randomRange(0, POWER_UP_RANDOM_OFFSET_MAX),
-  musicStepTimer: 0,
-  musicStepIndex: 0
+  nextPowerUpDistance: randomRange(0, POWER_UP_RANDOM_OFFSET_MAX)
 };
 
 function resetGame() {
@@ -456,8 +484,6 @@ function resetGame() {
   state.nextBirdSpawn = randomRange(4, 7);
   state.jumpBufferTimer = 0;
   state.nextPowerUpDistance = randomRange(0, POWER_UP_RANDOM_OFFSET_MAX);
-  state.musicStepTimer = 0;
-  state.musicStepIndex = 0;
 
   distanceEl.textContent = "0";
   speedEl.textContent = "1.0";
@@ -521,8 +547,7 @@ function jump() {
     state.started = true;
     messageEl.textContent = "Run for the giant carrot!";
     ensureAudioUnlocked();
-    playMusicStep(MUSIC_PATTERN[state.musicStepIndex]);
-    state.musicStepIndex = (state.musicStepIndex + 1) % MUSIC_PATTERN.length;
+    startBackgroundMusic();
   }
   if (state.rabbit.grounded) {
     const jumpVelocity =
