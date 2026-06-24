@@ -25,7 +25,7 @@ const POWER_UP_INTERVAL_METERS = 600;
 const POWER_UP_RANDOM_OFFSET_MAX = 200;
 const POWER_UP_RARITY_DISTANCE_SCALE = 5000;
 const JUMP_SOUND_DURATION = 0.12;
-const POWER_UP_SOUND_NOTE_DURATION = 0.12;
+const POWER_UP_SOUND_DURATION = 0.45;
 
 function runWhenAudioReady(context, onReady) {
   if (context.state === "suspended") {
@@ -42,6 +42,7 @@ function runWhenAudioReady(context, onReady) {
 }
 
 let audioCtx = null;
+let audioUnlocked = false;
 
 function getAudioContext() {
   if (audioCtx) {
@@ -55,6 +56,27 @@ function getAudioContext() {
 
   audioCtx = new AudioContextClass();
   return audioCtx;
+}
+
+function ensureAudioUnlocked() {
+  const context = getAudioContext();
+  if (!context || audioUnlocked) {
+    return;
+  }
+
+  if (context.state === "running") {
+    audioUnlocked = true;
+    return;
+  }
+
+  context
+    .resume()
+    .then(() => {
+      audioUnlocked = true;
+    })
+    .catch(() => {
+      // Ignore resume failures and keep gameplay uninterrupted.
+    });
 }
 
 function playJumpSound() {
@@ -103,35 +125,31 @@ function playPowerUpSound() {
 
   const triggerPowerUpSound = () => {
     const now = context.currentTime;
-    const notes = [392, 523.25, 659.25, 783.99];
-    const noteGap = 0.03;
+    const endTime = now + POWER_UP_SOUND_DURATION;
 
-    for (let i = 0; i < notes.length; i++) {
-      const startTime = now + i * (POWER_UP_SOUND_NOTE_DURATION + noteGap);
-      const endTime = startTime + POWER_UP_SOUND_NOTE_DURATION;
+    const leadOsc = context.createOscillator();
+    leadOsc.type = "square";
+    leadOsc.frequency.setValueAtTime(280, now);
+    leadOsc.frequency.exponentialRampToValueAtTime(1040, endTime);
 
-      const leadOsc = context.createOscillator();
-      leadOsc.type = "square";
-      leadOsc.frequency.setValueAtTime(notes[i], startTime);
+    const bodyOsc = context.createOscillator();
+    bodyOsc.type = "sawtooth";
+    bodyOsc.frequency.setValueAtTime(140, now);
+    bodyOsc.frequency.exponentialRampToValueAtTime(520, endTime);
 
-      const bodyOsc = context.createOscillator();
-      bodyOsc.type = "triangle";
-      bodyOsc.frequency.setValueAtTime(notes[i] / 2, startTime);
+    const gain = context.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.42, now + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
 
-      const gain = context.createGain();
-      gain.gain.setValueAtTime(0.0001, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.32, startTime + 0.012);
-      gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
+    leadOsc.connect(gain);
+    bodyOsc.connect(gain);
+    gain.connect(context.destination);
 
-      leadOsc.connect(gain);
-      bodyOsc.connect(gain);
-      gain.connect(context.destination);
-
-      leadOsc.start(startTime);
-      bodyOsc.start(startTime);
-      leadOsc.stop(endTime);
-      bodyOsc.stop(endTime);
-    }
+    leadOsc.start(now);
+    bodyOsc.start(now);
+    leadOsc.stop(endTime);
+    bodyOsc.stop(endTime);
   };
 
   runWhenAudioReady(context, triggerPowerUpSound);
@@ -276,6 +294,7 @@ function jump() {
 }
 
 function queueJump() {
+  ensureAudioUnlocked();
   state.jumpBufferTimer = JUMP_BUFFER_SECONDS;
   jump();
 }
@@ -851,6 +870,7 @@ window.addEventListener("keydown", (event) => {
 
 canvas.addEventListener("mousedown", (event) => {
   if (event.button === 0) {
+    ensureAudioUnlocked();
     queueJump();
   }
 });
