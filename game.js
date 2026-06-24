@@ -34,6 +34,7 @@ let bgmAudio = null;
 let bgmBuffer = null;
 let bgmSource = null;
 let bgmGain = null;
+let bgmEngine = "none";
 
 const MUSIC_PATTERN = [
   { lead: 659.25, bass: 164.81 },
@@ -208,18 +209,27 @@ function startBackgroundMusic() {
 
         bgmSource = source;
         bgmGain = gain;
+        bgmEngine = "webaudio";
+
+        // Ensure HTML audio fallback is not running at the same time.
+        if (bgmAudio && !bgmAudio.paused) {
+          bgmAudio.pause();
+          bgmAudio.currentTime = 0;
+        }
       }
     });
+    return;
   }
 
   const audio = getBgmAudio();
-  if (!audio || !audio.paused) {
+  if (!audio || !audio.paused || bgmEngine === "webaudio") {
     return;
   }
 
   audio.play().catch(() => {
     // Keep gameplay running even if browser blocks autoplay.
   });
+  bgmEngine = "html-audio";
 }
 
 function stopBackgroundMusic() {
@@ -244,6 +254,7 @@ function stopBackgroundMusic() {
 
   bgmAudio.pause();
   bgmAudio.currentTime = 0;
+  bgmEngine = "none";
 }
 
 function getAudioContext() {
