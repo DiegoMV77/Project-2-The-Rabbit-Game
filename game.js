@@ -27,6 +27,18 @@ const POWER_UP_RARITY_DISTANCE_SCALE = 5000;
 const JUMP_SOUND_DURATION = 0.12;
 const POWER_UP_NOTE_GAP = 0.045;
 const HIT_SOUND_DURATION = 0.24;
+const MUSIC_STEP_SECONDS = 0.16;
+
+const MUSIC_PATTERN = [
+  { lead: 659.25, bass: 164.81 },
+  { lead: 783.99, bass: null },
+  { lead: 659.25, bass: 196.0 },
+  { lead: 523.25, bass: null },
+  { lead: 587.33, bass: 146.83 },
+  { lead: 659.25, bass: null },
+  { lead: 493.88, bass: 174.61 },
+  { lead: 783.99, bass: null }
+];
 
 function runWhenAudioReady(context, onReady) {
   if (context.state === "suspended") {
@@ -215,6 +227,59 @@ function playHitSound() {
   runWhenAudioReady(context, triggerHitSound);
 }
 
+function playMusicStep(step) {
+  const context = getAudioContext();
+  if (!context || context.state !== "running") {
+    return;
+  }
+
+  const now = context.currentTime;
+  const leadDuration = 0.11;
+  const bassDuration = 0.13;
+
+  if (step.lead) {
+    const leadOsc = context.createOscillator();
+    leadOsc.type = "square";
+    leadOsc.frequency.setValueAtTime(step.lead, now);
+
+    const leadGain = context.createGain();
+    leadGain.gain.setValueAtTime(0.0001, now);
+    leadGain.gain.exponentialRampToValueAtTime(0.07, now + 0.008);
+    leadGain.gain.exponentialRampToValueAtTime(0.0001, now + leadDuration);
+
+    leadOsc.connect(leadGain);
+    leadGain.connect(context.destination);
+    leadOsc.start(now);
+    leadOsc.stop(now + leadDuration);
+  }
+
+  if (step.bass) {
+    const bassOsc = context.createOscillator();
+    bassOsc.type = "triangle";
+    bassOsc.frequency.setValueAtTime(step.bass, now);
+
+    const bassGain = context.createGain();
+    bassGain.gain.setValueAtTime(0.0001, now);
+    bassGain.gain.exponentialRampToValueAtTime(0.045, now + 0.01);
+    bassGain.gain.exponentialRampToValueAtTime(0.0001, now + bassDuration);
+
+    bassOsc.connect(bassGain);
+    bassGain.connect(context.destination);
+    bassOsc.start(now);
+    bassOsc.stop(now + bassDuration);
+  }
+}
+
+function updateBackgroundMusic(dt) {
+  state.musicStepTimer += dt;
+
+  while (state.musicStepTimer >= MUSIC_STEP_SECONDS) {
+    state.musicStepTimer -= MUSIC_STEP_SECONDS;
+    playMusicStep(MUSIC_PATTERN[state.musicStepIndex]);
+    state.musicStepIndex = (state.musicStepIndex + 1) % MUSIC_PATTERN.length;
+  }
+}
+
 const state = {
   rabbit: {
     x: 150,
@@ -247,7 +312,9 @@ const state = {
   birdSpawnTimer: 0,
   nextBirdSpawn: 3,
   jumpBufferTimer: 0,
-  nextPowerUpDistance: randomRange(0, POWER_UP_RANDOM_OFFSET_MAX)
+  nextPowerUpDistance: randomRange(0, POWER_UP_RANDOM_OFFSET_MAX),
+  musicStepTimer: 0,
+  musicStepIndex: 0
 };
 
 function resetGame() {
@@ -278,6 +345,8 @@ function resetGame() {
   state.nextBirdSpawn = randomRange(4, 7);
   state.jumpBufferTimer = 0;
   state.nextPowerUpDistance = randomRange(0, POWER_UP_RANDOM_OFFSET_MAX);
+  state.musicStepTimer = 0;
+  state.musicStepIndex = 0;
 
   distanceEl.textContent = "0";
   speedEl.textContent = "1.0";
@@ -512,6 +581,8 @@ function update(dt) {
   if (!state.started || state.paused || state.gameOver || state.win) {
     return;
   }
+
+  updateBackgroundMusic(dt);
 
   if (state.jumpBufferTimer > 0) {
     state.jumpBufferTimer = Math.max(0, state.jumpBufferTimer - dt);
