@@ -492,9 +492,9 @@ function spawnRock() {
 }
 
 function spawnSpecialRock() {
-  const h = 18;
-  const w = 24;
-  const x = canvas.width + 210;
+  const h = 20;
+  const w = 28;
+  const x = canvas.width - 120;
 
   const specialRock = {
     x,
@@ -511,6 +511,7 @@ function spawnSpecialRock() {
 
   state.rocks.push(specialRock);
   state.specialRockSpawned = true;
+  messageEl.textContent = "Special star rock ahead! Hit it for permanent power!";
 }
 
 function spawnBird() {
@@ -946,25 +947,30 @@ function drawRabbit() {
 
 function drawRock(rock) {
   const rowBounds = getRockCollisionShape(rock);
+  const baseColor = rock.special ? "#9099a5" : "#777d86";
 
   for (const row of rowBounds) {
-    drawPixelRect(row.x, row.y, row.w, row.h, "#777d86");
+    drawPixelRect(row.x, row.y, row.w, row.h, baseColor);
   }
 
-  drawPixelRect(rock.x + 8, rock.y + 4, Math.max(8, rock.w * 0.38), 3, "#a4acb8");
-  drawPixelRect(rock.x + rock.w * 0.42, rock.y + Math.max(8, rock.h * 0.26), Math.max(6, rock.w * 0.16), 2, "#8d95a0");
-  drawPixelRect(rock.x + 10, rock.y + Math.max(10, rock.h * 0.42), 4, 2, "#626a74");
-  drawPixelRect(rock.x + rock.w - 16, rock.y + Math.max(14, rock.h * 0.52), 4, 6, "#626a74");
-  drawPixelRect(rock.x + 6, rock.y + rock.h - 6, Math.max(7, rock.w * 0.26), 2, "#5a626d");
+  drawPixelRect(rock.x + 8, rock.y + 4, Math.max(8, rock.w * 0.38), 3, rock.special ? "#d4d9e1" : "#a4acb8");
+  drawPixelRect(rock.x + rock.w * 0.42, rock.y + Math.max(8, rock.h * 0.26), Math.max(6, rock.w * 0.16), 2, rock.special ? "#bfc6d0" : "#8d95a0");
+  drawPixelRect(rock.x + 10, rock.y + Math.max(10, rock.h * 0.42), 4, 2, rock.special ? "#7f8895" : "#626a74");
+  drawPixelRect(rock.x + rock.w - 16, rock.y + Math.max(14, rock.h * 0.52), 4, 6, rock.special ? "#7f8895" : "#626a74");
+  drawPixelRect(rock.x + 6, rock.y + rock.h - 6, Math.max(7, rock.w * 0.26), 2, rock.special ? "#747d89" : "#5a626d");
 
   if (rock.special) {
-    const starX = rock.x + rock.w * 0.5 - 3;
-    const starY = rock.y + 4;
-    drawPixelRect(starX + 2, starY, 2, 1, "#edf1f7");
-    drawPixelRect(starX + 1, starY + 1, 4, 1, "#d3d9e3");
-    drawPixelRect(starX, starY + 2, 6, 1, "#c5ccd8");
-    drawPixelRect(starX + 1, starY + 3, 4, 1, "#d3d9e3");
-    drawPixelRect(starX + 2, starY + 4, 2, 1, "#edf1f7");
+    const starX = rock.x + rock.w * 0.5 - 4;
+    const starY = rock.y + 3;
+    drawPixelRect(starX + 3, starY, 2, 1, "#f2f5fa");
+    drawPixelRect(starX + 2, starY + 1, 4, 1, "#dfe4ec");
+    drawPixelRect(starX, starY + 2, 8, 1, "#cdd3dc");
+    drawPixelRect(starX + 1, starY + 3, 6, 1, "#dfe4ec");
+    drawPixelRect(starX + 2, starY + 4, 4, 1, "#edf1f7");
+    drawPixelRect(starX + 3, starY + 5, 2, 1, "#f2f5fa");
+
+    const beaconY = rock.y - 8 + Math.sin(performance.now() / 180) * 1.2;
+    drawPixelRect(rock.x + rock.w * 0.5 - 1, beaconY, 2, 6, "#d7dde7");
   }
 }
 
