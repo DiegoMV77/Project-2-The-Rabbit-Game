@@ -493,7 +493,7 @@ function spawnRock() {
 
 function spawnSpecialRock() {
   const h = 20;
-  const w = 28;
+  const w = 58;
   const x = canvas.width - 120;
 
   const specialRock = {
