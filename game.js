@@ -511,7 +511,6 @@ function spawnSpecialRock() {
 
   state.rocks.push(specialRock);
   state.specialRockSpawned = true;
-  messageEl.textContent = "Special star rock ahead! Hit it for permanent power!";
 }
 
 function spawnBird() {
