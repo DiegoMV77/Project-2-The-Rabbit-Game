@@ -323,7 +323,9 @@ const state = {
   nextPowerUpDistance: randomRange(0, POWER_UP_RANDOM_OFFSET_MAX),
   specialRockSpawned: false,
   specialRockCollected: false,
-  specialRockSpawnDistance: randomRange(SPECIAL_ROCK_MIN_DISTANCE, SPECIAL_ROCK_MAX_DISTANCE)
+  specialRockSpawnDistance: Math.floor(
+    randomRange(SPECIAL_ROCK_MIN_DISTANCE, SPECIAL_ROCK_MAX_DISTANCE + 1)
+  )
 };
 
 function resetGame() {
@@ -359,7 +361,9 @@ function resetGame() {
   state.nextPowerUpDistance = randomRange(0, POWER_UP_RANDOM_OFFSET_MAX);
   state.specialRockSpawned = false;
   state.specialRockCollected = false;
-  state.specialRockSpawnDistance = randomRange(SPECIAL_ROCK_MIN_DISTANCE, SPECIAL_ROCK_MAX_DISTANCE);
+  state.specialRockSpawnDistance = Math.floor(
+    randomRange(SPECIAL_ROCK_MIN_DISTANCE, SPECIAL_ROCK_MAX_DISTANCE + 1)
+  );
 
   distanceEl.textContent = "0";
   speedEl.textContent = "1.0";
@@ -485,6 +489,10 @@ function spawnRock() {
 }
 
 function spawnSpecialRock() {
+  if (state.distance < SPECIAL_ROCK_MIN_DISTANCE) {
+    return;
+  }
+
   const h = 20;
   const levelProgress = Math.min(state.distance / 7000, 1);
   const hardModeProgress = Math.min(Math.max((state.distance - 300) / 6700, 0), 1);
@@ -713,7 +721,11 @@ function update(dt) {
     scheduleNextPowerUpDistance();
   }
 
-  if (!state.specialRockSpawned && state.distance >= state.specialRockSpawnDistance) {
+  if (
+    !state.specialRockSpawned &&
+    state.distance >= SPECIAL_ROCK_MIN_DISTANCE &&
+    state.distance >= state.specialRockSpawnDistance
+  ) {
     spawnSpecialRock();
   }
 
