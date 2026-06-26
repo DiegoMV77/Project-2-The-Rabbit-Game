@@ -30,6 +30,7 @@ const SPECIAL_ROCK_TEST_SPAWN_DISTANCE = 100;
 const SPECIAL_ROCK_USE_TEST_SPAWN = true;
 const SPECIAL_ROCK_CLEAR_WINDOW_BEFORE = 35;
 const SPECIAL_ROCK_CLEAR_WINDOW_AFTER = 45;
+const ROCK_POWER_MESSAGE = "Star rock power active: permanent invincibility + 5x speed";
 const JUMP_SOUND_DURATION = 0.12;
 const POWER_UP_NOTE_GAP = 0.045;
 const HIT_SOUND_DURATION = 0.24;
@@ -634,7 +635,9 @@ function update(dt) {
     state.jumpBufferTimer = Math.max(0, state.jumpBufferTimer - dt);
   }
 
-  if (state.invincibilityTimer > 0) {
+  if (state.permanentInvincibility) {
+    messageEl.textContent = ROCK_POWER_MESSAGE;
+  } else if (state.invincibilityTimer > 0) {
     state.invincibilityTimer = Math.max(0, state.invincibilityTimer - dt);
     messageEl.textContent = `Power up! Invincible - ${Math.ceil(state.invincibilityTimer)}s left`;
   }
@@ -746,9 +749,14 @@ function update(dt) {
   for (const powerUp of state.powerUps) {
     const puHitbox = { x: powerUp.x + 2, y: powerUp.y + 2, w: powerUp.w - 4, h: powerUp.h - 4 };
     if (intersects(rabbitHitbox, puHitbox)) {
-      state.invincibilityTimer = INVINCIBILITY_DURATION;
       playPowerUpSound();
-      messageEl.textContent = `Power up! Invincible - ${Math.ceil(state.invincibilityTimer)}s left`;
+      if (state.permanentInvincibility) {
+        state.invincibilityTimer = 0;
+        messageEl.textContent = ROCK_POWER_MESSAGE;
+      } else {
+        state.invincibilityTimer = INVINCIBILITY_DURATION;
+        messageEl.textContent = `Power up! Invincible - ${Math.ceil(state.invincibilityTimer)}s left`;
+      }
       state.powerUps = state.powerUps.filter((pu) => pu !== powerUp);
     }
   }
@@ -766,7 +774,7 @@ function update(dt) {
       state.specialRockCollected = true;
       state.rocks.splice(i, 1);
       playPowerUpSound();
-      messageEl.textContent = "Star rock! Permanent invincibility and 5x speed activated!";
+      messageEl.textContent = ROCK_POWER_MESSAGE;
       break;
     }
   }
