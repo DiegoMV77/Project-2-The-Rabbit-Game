@@ -28,8 +28,6 @@ const SPECIAL_ROCK_MIN_DISTANCE = 3000;
 const SPECIAL_ROCK_MAX_DISTANCE = 10000;
 const SPECIAL_ROCK_TEST_SPAWN_DISTANCE = 100;
 const SPECIAL_ROCK_USE_TEST_SPAWN = true;
-const SPECIAL_ROCK_CLEAR_WINDOW_BEFORE = 35;
-const SPECIAL_ROCK_CLEAR_WINDOW_AFTER = 45;
 const ROCK_POWER_MESSAGE = "Star rock power active: permanent invincibility + 5x speed";
 const JUMP_SOUND_DURATION = 0.12;
 const POWER_UP_NOTE_GAP = 0.045;
@@ -494,24 +492,36 @@ function spawnRock() {
 
 function spawnSpecialRock() {
   const h = 20;
-  const w = 58;
-  const x = canvas.width - 120;
+  const levelProgress = Math.min(state.distance / 7000, 1);
+  const hardModeProgress = Math.min(Math.max((state.distance - 300) / 6700, 0), 1);
+  const earlySpacingBonus = state.distance < 300 ? (1 - state.distance / 300) * 80 : 0;
+  const widthScale = 0.94 - levelProgress * 0.06;
+  const w = randomRange(54, 74) * widthScale;
+  const spawnOffsetMax = 160 + earlySpacingBonus - hardModeProgress * 30;
 
-  const specialRock = {
-    x,
-    y: GROUND_Y - h,
-    w,
-    h,
-    special: true
-  };
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const specialRock = {
+      x: canvas.width + randomRange(0, spawnOffsetMax),
+      y: GROUND_Y - h,
+      w,
+      h,
+      special: true
+    };
 
-  // Keep nearby terrain clear so the test spawn is easy to spot.
-  state.rocks = state.rocks.filter(
-    (rock) => rock.special || rock.x + rock.w < x - 70 || rock.x > x + w + 70
-  );
+    let overlapsPowerUp = false;
+    for (const powerUp of state.powerUps) {
+      if (intersects(specialRock, powerUp)) {
+        overlapsPowerUp = true;
+        break;
+      }
+    }
 
-  state.rocks.push(specialRock);
-  state.specialRockSpawned = true;
+    if (!overlapsPowerUp) {
+      state.rocks.push(specialRock);
+      state.specialRockSpawned = true;
+      return;
+    }
+  }
 }
 
 function spawnBird() {
@@ -673,14 +683,6 @@ function update(dt) {
   state.rockSpawnTimer += dt;
   if (state.rockSpawnTimer >= state.nextRockSpawn) {
     state.rockSpawnTimer = 0;
-    const inSpecialRockWindow =
-      !state.specialRockCollected &&
-      state.distance >= state.specialRockSpawnDistance - SPECIAL_ROCK_CLEAR_WINDOW_BEFORE &&
-      state.distance <= state.specialRockSpawnDistance + SPECIAL_ROCK_CLEAR_WINDOW_AFTER;
-
-    if (inSpecialRockWindow) {
-      state.nextRockSpawn = randomRange(0.95, 1.45);
-    } else {
     const easyStartProgress = Math.min(state.distance / 300, 1);
     const hardModeProgress = Math.min(Math.max((state.distance - 300) / 6700, 0), 1);
     const levelProgress = Math.min(state.distance / CARROT_GOAL, 1);
@@ -698,7 +700,6 @@ function update(dt) {
       if (Math.random() < bonusRockChance * 0.35) {
         spawnRock();
       }
-    }
     }
   }
 
