@@ -26,8 +26,6 @@ const POWER_UP_RANDOM_OFFSET_MAX = 200;
 const POWER_UP_RARITY_DISTANCE_SCALE = 5000;
 const SPECIAL_ROCK_MIN_DISTANCE = 3000;
 const SPECIAL_ROCK_MAX_DISTANCE = 10000;
-const SPECIAL_ROCK_TEST_SPAWN_DISTANCE = 100;
-const SPECIAL_ROCK_USE_TEST_SPAWN = false;
 const ROCK_POWER_MESSAGE = "Star rock power active: permanent invincibility + 5x speed";
 const JUMP_SOUND_DURATION = 0.12;
 const POWER_UP_NOTE_GAP = 0.045;
@@ -325,9 +323,7 @@ const state = {
   nextPowerUpDistance: randomRange(0, POWER_UP_RANDOM_OFFSET_MAX),
   specialRockSpawned: false,
   specialRockCollected: false,
-  specialRockSpawnDistance: SPECIAL_ROCK_USE_TEST_SPAWN
-    ? SPECIAL_ROCK_TEST_SPAWN_DISTANCE
-    : randomRange(SPECIAL_ROCK_MIN_DISTANCE, SPECIAL_ROCK_MAX_DISTANCE)
+  specialRockSpawnDistance: randomRange(SPECIAL_ROCK_MIN_DISTANCE, SPECIAL_ROCK_MAX_DISTANCE)
 };
 
 function resetGame() {
@@ -363,9 +359,7 @@ function resetGame() {
   state.nextPowerUpDistance = randomRange(0, POWER_UP_RANDOM_OFFSET_MAX);
   state.specialRockSpawned = false;
   state.specialRockCollected = false;
-  state.specialRockSpawnDistance = SPECIAL_ROCK_USE_TEST_SPAWN
-    ? SPECIAL_ROCK_TEST_SPAWN_DISTANCE
-    : randomRange(SPECIAL_ROCK_MIN_DISTANCE, SPECIAL_ROCK_MAX_DISTANCE);
+  state.specialRockSpawnDistance = randomRange(SPECIAL_ROCK_MIN_DISTANCE, SPECIAL_ROCK_MAX_DISTANCE);
 
   distanceEl.textContent = "0";
   speedEl.textContent = "1.0";
