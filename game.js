@@ -24,6 +24,10 @@ const DISTANCE_TO_PIXEL_SCALE = 10;
 const POWER_UP_INTERVAL_METERS = 600;
 const POWER_UP_RANDOM_OFFSET_MAX = 200;
 const POWER_UP_RARITY_DISTANCE_SCALE = 5000;
+const SPECIAL_ROCK_MIN_DISTANCE = 3000;
+const SPECIAL_ROCK_MAX_DISTANCE = 10000;
+const SPECIAL_ROCK_TEST_SPAWN_DISTANCE = 100;
+const SPECIAL_ROCK_USE_TEST_SPAWN = true;
 const JUMP_SOUND_DURATION = 0.12;
 const POWER_UP_NOTE_GAP = 0.045;
 const HIT_SOUND_DURATION = 0.24;
@@ -306,6 +310,8 @@ const state = {
   paused: false,
   lastMessageBeforePause: "",
   invincibilityTimer: 0,
+  permanentInvincibility: false,
+  specialSpeedMultiplier: 1,
   gameOver: false,
   win: false,
   started: false,
@@ -315,7 +321,12 @@ const state = {
   birdSpawnTimer: 0,
   nextBirdSpawn: 3,
   jumpBufferTimer: 0,
-  nextPowerUpDistance: randomRange(0, POWER_UP_RANDOM_OFFSET_MAX)
+  nextPowerUpDistance: randomRange(0, POWER_UP_RANDOM_OFFSET_MAX),
+  specialRockSpawned: false,
+  specialRockCollected: false,
+  specialRockSpawnDistance: SPECIAL_ROCK_USE_TEST_SPAWN
+    ? SPECIAL_ROCK_TEST_SPAWN_DISTANCE
+    : randomRange(SPECIAL_ROCK_MIN_DISTANCE, SPECIAL_ROCK_MAX_DISTANCE)
 };
 
 function resetGame() {
@@ -337,6 +348,8 @@ function resetGame() {
   state.paused = false;
   state.lastMessageBeforePause = "";
   state.invincibilityTimer = 0;
+  state.permanentInvincibility = false;
+  state.specialSpeedMultiplier = 1;
   state.gameOver = false;
   state.win = false;
   state.started = false;
@@ -347,6 +360,11 @@ function resetGame() {
   state.nextBirdSpawn = randomRange(4, 7);
   state.jumpBufferTimer = 0;
   state.nextPowerUpDistance = randomRange(0, POWER_UP_RANDOM_OFFSET_MAX);
+  state.specialRockSpawned = false;
+  state.specialRockCollected = false;
+  state.specialRockSpawnDistance = SPECIAL_ROCK_USE_TEST_SPAWN
+    ? SPECIAL_ROCK_TEST_SPAWN_DISTANCE
+    : randomRange(SPECIAL_ROCK_MIN_DISTANCE, SPECIAL_ROCK_MAX_DISTANCE);
 
   distanceEl.textContent = "0";
   speedEl.textContent = "1.0";
@@ -436,7 +454,7 @@ function spawnRock() {
   const h = heights[Math.floor(Math.random() * heights.length)];
   const levelProgress = Math.min(state.distance / 7000, 1);
   const hardModeProgress = Math.min(Math.max((state.distance - 300) / 6700, 0), 1);
-  const earlySpacingBonus = state.distance < 300 ? (1 - state.distance / 300) * 60 : 0;
+  const earlySpacingBonus = state.distance < 300 ? (1 - state.distance / 300) * 80 : 0;
   const widthScale = 0.94 - levelProgress * 0.06;
   const widthByHeight = {
     20: randomRange(54, 74) * widthScale,
@@ -445,7 +463,7 @@ function spawnRock() {
     42: randomRange(76, 104) * widthScale
   };
   const w = widthByHeight[h] ?? randomRange(56, 84) * widthScale;
-  const spawnOffsetMax = 120 + earlySpacingBonus - hardModeProgress * 50;
+  const spawnOffsetMax = 160 + earlySpacingBonus - hardModeProgress * 30;
 
   // Keep rocks from spawning directly on top of golden carrots.
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -469,6 +487,22 @@ function spawnRock() {
       return;
     }
   }
+}
+
+function spawnSpecialRock() {
+  const h = 18;
+  const w = 24;
+
+  const specialRock = {
+    x: canvas.width + randomRange(42, 120),
+    y: GROUND_Y - h,
+    w,
+    h,
+    special: true
+  };
+
+  state.rocks.push(specialRock);
+  state.specialRockSpawned = true;
 }
 
 function spawnBird() {
@@ -604,7 +638,7 @@ function update(dt) {
     state.speedMultiplier *= INVINCIBILITY_SPEED_MULTIPLIER;
   }
   
-  state.worldSpeed = BASE_SPEED * state.speedMultiplier;
+  state.worldSpeed = BASE_SPEED * state.speedMultiplier * state.specialSpeedMultiplier;
 
   state.distance += state.worldSpeed * dt * 0.1;
   state.mountainOffset += state.worldSpeed * dt * 0.12;
@@ -630,10 +664,22 @@ function update(dt) {
     state.rockSpawnTimer = 0;
     const easyStartProgress = Math.min(state.distance / 300, 1);
     const hardModeProgress = Math.min(Math.max((state.distance - 300) / 6700, 0), 1);
+    const levelProgress = Math.min(state.distance / CARROT_GOAL, 1);
     const earlySpacingScale = 1.25 - easyStartProgress * 0.25;
-    const harderSpacingScale = 1 - hardModeProgress * 0.28;
-    state.nextRockSpawn = randomRange(0.55, 1.25) * earlySpacingScale * harderSpacingScale;
+    const harderSpacingScale = 1 - hardModeProgress * 0.34;
+    const lateGameDensityScale = 1 - levelProgress * 0.38;
+    state.nextRockSpawn =
+      randomRange(0.74, 1.45) * earlySpacingScale * harderSpacingScale * lateGameDensityScale;
     spawnRock();
+
+    // Spawn extra rocks more often later in the run to ramp challenge.
+    const bonusRockChance = Math.max(0, (state.distance - 2600) / 7400) * 0.52;
+    if (Math.random() < bonusRockChance) {
+      spawnRock();
+      if (Math.random() < bonusRockChance * 0.35) {
+        spawnRock();
+      }
+    }
   }
 
   if (state.distance > 800) {
@@ -650,6 +696,10 @@ function update(dt) {
   while (state.distance >= state.nextPowerUpDistance) {
     spawnPowerUp();
     scheduleNextPowerUpDistance();
+  }
+
+  if (!state.specialRockSpawned && state.distance >= state.specialRockSpawnDistance) {
+    spawnSpecialRock();
   }
 
   for (const rock of state.rocks) {
@@ -686,7 +736,25 @@ function update(dt) {
     }
   }
 
-  if (state.invincibilityTimer <= 0) {
+  for (let i = 0; i < state.rocks.length; i++) {
+    const rock = state.rocks[i];
+    if (!rock.special) {
+      continue;
+    }
+
+    if (intersectsRock(rabbitHitbox, rock)) {
+      state.permanentInvincibility = true;
+      state.specialSpeedMultiplier = 5;
+      state.invincibilityTimer = 0;
+      state.specialRockCollected = true;
+      state.rocks.splice(i, 1);
+      playPowerUpSound();
+      messageEl.textContent = "Star rock! Permanent invincibility and 5x speed activated!";
+      break;
+    }
+  }
+
+  if (state.invincibilityTimer <= 0 && !state.permanentInvincibility) {
     for (const rock of state.rocks) {
       if (intersectsRock(rabbitHitbox, rock)) {
         playHitSound();
@@ -871,6 +939,15 @@ function drawRock(rock) {
   drawPixelRect(rock.x + 10, rock.y + Math.max(10, rock.h * 0.42), 4, 2, "#626a74");
   drawPixelRect(rock.x + rock.w - 16, rock.y + Math.max(14, rock.h * 0.52), 4, 6, "#626a74");
   drawPixelRect(rock.x + 6, rock.y + rock.h - 6, Math.max(7, rock.w * 0.26), 2, "#5a626d");
+
+  if (rock.special) {
+    const starX = rock.x + rock.w * 0.5 - 2;
+    const starY = rock.y + rock.h * 0.35;
+    drawPixelRect(starX + 1, starY, 2, 1, "#d9dde3");
+    drawPixelRect(starX, starY + 1, 4, 1, "#c7cbd2");
+    drawPixelRect(starX + 1, starY + 2, 2, 1, "#d9dde3");
+    drawPixelRect(starX + 1, starY + 3, 1, 1, "#b8bdc5");
+  }
 }
 
 function drawBird(bird) {
@@ -891,13 +968,18 @@ function drawBird(bird) {
 
 function drawCarrot() {
   const remainingDistance = CARROT_GOAL - state.distance;
-  const x = state.rabbit.x + remainingDistance * DISTANCE_TO_PIXEL_SCALE;
+  let x = state.rabbit.x + remainingDistance * DISTANCE_TO_PIXEL_SCALE;
+
+  // Keep the finish carrot on-screen once the player reaches it.
+  if (state.win) {
+    x = Math.min(canvas.width - 240, Math.max(120, x));
+  }
 
   if (x < -220 || x > canvas.width + 220) {
     return;
   }
 
-  const scale = 2.4;
+  const scale = 3.1;
   const y = GROUND_Y - 52 * scale;
 
   drawPixelRect(x + 10 * scale, y, 16 * scale, 10 * scale, "#55a55e");
@@ -928,14 +1010,13 @@ function drawPowerUp(powerUp) {
 
 function drawHud() {
   distanceEl.textContent = Math.floor(state.distance).toString();
-  speedEl.textContent = state.speedMultiplier.toFixed(1);
+  speedEl.textContent = (state.speedMultiplier * state.specialSpeedMultiplier).toFixed(1);
   timeEl.textContent = state.elapsedTime.toFixed(2);
   bestTimeEl.textContent = state.bestTime.toFixed(2);
 }
 
 function draw() {
   drawBackground();
-  drawCarrot();
 
   for (const rock of state.rocks) {
     drawRock(rock);
@@ -948,6 +1029,9 @@ function draw() {
   for (const powerUp of state.powerUps) {
     drawPowerUp(powerUp);
   }
+
+  // Draw finish marker above obstacles so it stays visible.
+  drawCarrot();
 
   drawRabbit();
 
