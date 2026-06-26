@@ -28,6 +28,8 @@ const SPECIAL_ROCK_MIN_DISTANCE = 3000;
 const SPECIAL_ROCK_MAX_DISTANCE = 10000;
 const SPECIAL_ROCK_TEST_SPAWN_DISTANCE = 100;
 const SPECIAL_ROCK_USE_TEST_SPAWN = true;
+const SPECIAL_ROCK_CLEAR_WINDOW_BEFORE = 35;
+const SPECIAL_ROCK_CLEAR_WINDOW_AFTER = 45;
 const JUMP_SOUND_DURATION = 0.12;
 const POWER_UP_NOTE_GAP = 0.045;
 const HIT_SOUND_DURATION = 0.24;
@@ -492,14 +494,20 @@ function spawnRock() {
 function spawnSpecialRock() {
   const h = 18;
   const w = 24;
+  const x = canvas.width + 210;
 
   const specialRock = {
-    x: canvas.width + randomRange(42, 120),
+    x,
     y: GROUND_Y - h,
     w,
     h,
     special: true
   };
+
+  // Keep nearby terrain clear so the test spawn is easy to spot.
+  state.rocks = state.rocks.filter(
+    (rock) => rock.special || rock.x + rock.w < x - 70 || rock.x > x + w + 70
+  );
 
   state.rocks.push(specialRock);
   state.specialRockSpawned = true;
@@ -662,6 +670,14 @@ function update(dt) {
   state.rockSpawnTimer += dt;
   if (state.rockSpawnTimer >= state.nextRockSpawn) {
     state.rockSpawnTimer = 0;
+    const inSpecialRockWindow =
+      !state.specialRockCollected &&
+      state.distance >= state.specialRockSpawnDistance - SPECIAL_ROCK_CLEAR_WINDOW_BEFORE &&
+      state.distance <= state.specialRockSpawnDistance + SPECIAL_ROCK_CLEAR_WINDOW_AFTER;
+
+    if (inSpecialRockWindow) {
+      state.nextRockSpawn = randomRange(0.95, 1.45);
+    } else {
     const easyStartProgress = Math.min(state.distance / 300, 1);
     const hardModeProgress = Math.min(Math.max((state.distance - 300) / 6700, 0), 1);
     const levelProgress = Math.min(state.distance / CARROT_GOAL, 1);
@@ -679,6 +695,7 @@ function update(dt) {
       if (Math.random() < bonusRockChance * 0.35) {
         spawnRock();
       }
+    }
     }
   }
 
@@ -941,12 +958,13 @@ function drawRock(rock) {
   drawPixelRect(rock.x + 6, rock.y + rock.h - 6, Math.max(7, rock.w * 0.26), 2, "#5a626d");
 
   if (rock.special) {
-    const starX = rock.x + rock.w * 0.5 - 2;
-    const starY = rock.y + rock.h * 0.35;
-    drawPixelRect(starX + 1, starY, 2, 1, "#d9dde3");
-    drawPixelRect(starX, starY + 1, 4, 1, "#c7cbd2");
-    drawPixelRect(starX + 1, starY + 2, 2, 1, "#d9dde3");
-    drawPixelRect(starX + 1, starY + 3, 1, 1, "#b8bdc5");
+    const starX = rock.x + rock.w * 0.5 - 3;
+    const starY = rock.y + 4;
+    drawPixelRect(starX + 2, starY, 2, 1, "#edf1f7");
+    drawPixelRect(starX + 1, starY + 1, 4, 1, "#d3d9e3");
+    drawPixelRect(starX, starY + 2, 6, 1, "#c5ccd8");
+    drawPixelRect(starX + 1, starY + 3, 4, 1, "#d3d9e3");
+    drawPixelRect(starX + 2, starY + 4, 2, 1, "#edf1f7");
   }
 }
 
